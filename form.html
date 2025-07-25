@@ -303,7 +303,7 @@
           <div class="flex-1 flex flex-col relative">
             <!-- Search bar at top of map -->
             <!-- <div class="mb-4 px-4"> -->
-              <div class="absolute top-4 left-4 z-[1001] w-full max-w-md px-4">
+              <div class="absolute top-4 left-4 z-[1000] w-full max-w-md px-4">
               <label class="flex flex-col min-w-40 h-12 max-w-md ">
                 <div class="flex w-full flex-1 items-stretch rounded-xl h-full">
                   <div
@@ -453,10 +453,257 @@
               />
             </div> -->
 
-            <!-- Generate OFP Button -->
+            <!-- Next Button -->
             <button class="flex min-w-[84px] max-w-[480px] cursor-pointer items-center justify-center overflow-hidden rounded-lg h-12 px-3 w-full bg-[#2563eb] text-white text-lg font-bold leading-normal tracking-[0.015em] hover:bg-[#1d4ed8] transition-colors">
-              Generate OFP
+              Next
             </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bottom Section for Flight Calculations -->
+    <div id="calculation-panel" class="w-full bg-[#1c1f26] border-t border-[#2c333f] hidden transition-all duration-300 ease-in-out">
+      <!-- Panel Header -->
+      <div class="bg-[#15181e] px-6 py-4 border-b border-[#2c333f]">
+        <div class="flex items-center gap-3">
+          <div class="w-1 h-6 bg-[#2563eb] rounded-full"></div>
+          <h2 class="text-white text-xl font-bold tracking-wide">Flight Performance Calculation</h2>
+        </div>
+      </div>
+
+      <!-- Panel Content -->
+      <div class="p-6">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          
+          <!-- Section 1: Flight Crew Weight Confirmation -->
+          <div class="space-y-6">
+            <div class="flex items-center gap-3 mb-4">
+              <div class="w-8 h-8 bg-[#2563eb] rounded-full flex items-center justify-center text-white font-bold text-sm">1</div>
+              <h3 class="text-white text-lg font-semibold tracking-wide">Flight Crew Weight</h3>
+            </div>
+            
+            <div class="space-y-4 bg-[#20242d] rounded-lg p-4 border border-[#2c333f]">
+              <!-- PIC Weight -->
+              <div class="flex items-center justify-between">
+                <div class="flex-1">
+                  <label class="text-white text-base font-medium block mb-1">Pilot in Command</label>
+                  <div class="text-[#a0a9bb] text-sm" id="pic-name-display">Enter PIC Name</div>
+                </div>
+                <div class="flex items-center gap-2">
+                  <input type="number" id="pic-weight" class="w-24 h-10 bg-[#15181e] border border-[#2c333f] rounded-lg text-white text-center focus:outline-none focus:border-[#2563eb] transition-colors" placeholder="75" />
+                  <span class="text-[#a0a9bb] text-base">kg</span>
+                </div>
+              </div>
+
+              <!-- SIC Weight -->
+              <div class="flex items-center justify-between">
+                <div class="flex-1">
+                  <label class="text-white text-base font-medium block mb-1">Second in Command</label>
+                  <div class="text-[#a0a9bb] text-sm" id="sic-name-display">Enter SIC Name</div>
+                </div>
+                <div class="flex items-center gap-2">
+                  <input type="number" id="sic-weight" class="w-24 h-10 bg-[#15181e] border border-[#2c333f] rounded-lg text-white text-center focus:outline-none focus:border-[#2563eb] transition-colors" placeholder="75" />
+                  <span class="text-[#a0a9bb] text-base">kg</span>
+                </div>
+              </div>
+
+              <!-- HOP Weight -->
+              <div class="flex items-center justify-between">
+                <div class="flex-1">
+                  <label class="text-white text-base font-medium block mb-1">Hoist Operator</label>
+                  <div class="text-[#a0a9bb] text-sm" id="hop-name-display">Enter HOP Name</div>
+                </div>
+                <div class="flex items-center gap-2">
+                  <input type="number" id="hop-weight" class="w-24 h-10 bg-[#15181e] border border-[#2c333f] rounded-lg text-white text-center focus:outline-none focus:border-[#2563eb] transition-colors" placeholder="75" />
+                  <span class="text-[#a0a9bb] text-base">kg</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Section 2: Weather Data -->
+          <div class="space-y-6">
+            <div class="flex items-center gap-3 mb-4">
+              <div class="w-8 h-8 bg-[#2563eb] rounded-full flex items-center justify-center text-white font-bold text-sm">2</div>
+              <h3 class="text-white text-lg font-semibold tracking-wide">Weather Data</h3>
+            </div>
+            
+            <div class="space-y-4 bg-[#20242d] rounded-lg p-4 border border-[#2c333f]">
+              <!-- Wind Speed -->
+              <div class="flex items-center justify-between">
+                <label class="text-white text-base font-medium">Wind Speed</label>
+                <div class="flex items-center gap-2">
+                  <input type="number" id="wind-speed" class="w-24 h-10 bg-[#15181e] border border-[#2c333f] rounded-lg text-white text-center focus:outline-none focus:border-[#2563eb] transition-colors" placeholder="12" />
+                  <span class="text-[#a0a9bb] text-base">kts</span>
+                </div>
+              </div>
+
+              <!-- Wind Direction -->
+              <div class="flex items-center justify-between">
+                <label class="text-white text-base font-medium">Wind Direction</label>
+                <div class="flex items-center gap-2">
+                  <input type="number" id="wind-direction" class="w-24 h-10 bg-[#15181e] border border-[#2c333f] rounded-lg text-white text-center focus:outline-none focus:border-[#2563eb] transition-colors" placeholder="270" />
+                  <span class="text-[#a0a9bb] text-base">°</span>
+                </div>
+              </div>
+
+              <!-- Wind Benefits -->
+              <div class="flex items-center justify-between">
+                <label class="text-white text-base font-medium">Wind Benefits</label>
+                <div class="flex items-center gap-2">
+                  <input type="number" id="wind-benefits" class="w-24 h-10 bg-[#15181e] border border-[#2c333f] rounded-lg text-white text-center focus:outline-none focus:border-[#2563eb] transition-colors" placeholder="75" />
+                  <span class="text-[#a0a9bb] text-base">%</span>
+                </div>
+              </div>
+
+              <!-- Temperature -->
+              <div class="flex items-center justify-between">
+                <label class="text-white text-base font-medium">Temperature</label>
+                <div class="flex items-center gap-2">
+                  <input type="number" id="temperature" class="w-24 h-10 bg-[#15181e] border border-[#2c333f] rounded-lg text-white text-center focus:outline-none focus:border-[#2563eb] transition-colors" placeholder="25" />
+                  <span class="text-[#a0a9bb] text-base">°C</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Section 3: Fuel Calculation -->
+          <div class="space-y-6">
+            <div class="flex items-center gap-3 mb-4">
+              <div class="w-8 h-8 bg-[#2563eb] rounded-full flex items-center justify-center text-white font-bold text-sm">3</div>
+              <h3 class="text-white text-lg font-semibold tracking-wide">Fuel Calculation</h3>
+            </div>
+            
+            <div class="bg-[#20242d] rounded-lg p-4 border border-[#2c333f] space-y-4">
+            <!-- Taxi -->
+            <div class="flex items-center justify-between">
+              <label class="text-white text-base font-medium">Taxi</label>
+              <div class="flex items-center gap-2">
+                <span class="text-[#a0a9bb] text-base">60 kg</span>
+              </div>
+            </div>
+
+            <!-- Trip -->
+            <div class="flex items-center justify-between">
+              <label class="text-white text-base font-medium">Trip</label>
+              <div class="flex items-center gap-2">
+                <span id="trip-duration" class="text-[#a0a9bb] text-base">-- min</span>
+                <span id="trip-fuel" class="text-[#a0a9bb] text-base">-- kg</span>
+              </div>
+            </div>
+
+            <!-- Final Reserve -->
+            <div class="flex items-center justify-between">
+              <label class="text-white text-base font-medium">Final Reserve</label>
+              <div class="flex items-center gap-2">
+                <span class="text-[#a0a9bb] text-base">30 min</span>
+                <span class="text-[#a0a9bb] text-base">120 kg</span>
+              </div>
+            </div>
+
+            <!-- Contingency -->
+            <div class="flex items-center justify-between">
+              <label class="text-white text-base font-medium">Contingency (10%)</label>
+              <div class="flex items-center gap-2">
+                <span id="contingency-duration" class="text-[#a0a9bb] text-base">-- min</span>
+                <span id="contingency-fuel" class="text-[#a0a9bb] text-base">-- kg</span>
+              </div>
+            </div>
+
+            <!-- Extras -->
+            <div class="flex items-center justify-between">
+              <label class="text-white text-base font-medium">Extras</label>
+              <div class="flex items-center gap-2">
+                <span class="text-[#a0a9bb] text-base">80 kg</span>
+              </div>
+            </div>
+
+            <!-- Discretion (Editable) -->
+            <div class="flex items-center justify-between">
+              <label class="text-white text-base font-medium">Discretion</label>
+              <div class="flex items-center gap-2">
+                <input type="number" id="discretion-fuel" class="w-24 h-10 bg-[#15181e] border border-[#2c333f] rounded-lg text-white text-center focus:outline-none focus:border-[#2563eb] transition-colors" placeholder="50" />
+                <span class="text-[#a0a9bb] text-sm">kg</span>
+              </div>
+            </div>
+
+            <!-- Total Fuel -->
+            <div class="border-t border-[#2c333f] pt-4 mt-4">
+              <div class="flex items-center justify-between">
+                <label class="text-white text-lg font-semibold">Total Fuel</label>
+                <div class="text-right">
+                  <div id="total-fuel" class="text-[#2563eb] text-2xl font-bold">-- kg</div>
+                  <div class="text-[#a0a9bb] text-xs">Required</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 4: Performance Results -->
+        <div class="mt-8 border-t border-[#2c333f] pt-6">
+          <div class="flex items-center justify-between mb-6">
+            <div class="flex items-center gap-3">
+              <div class="w-8 h-8 bg-[#16a34a] rounded-full flex items-center justify-center text-white font-bold text-sm">4</div>
+              <h3 class="text-white text-xl font-bold tracking-wide">Performance Results</h3>
+            </div>
+            <!-- Action Buttons -->
+            <div class="flex gap-4">
+              <button id="recalculate-btn" class="px-6 py-3 bg-[#2a2f3a] text-white rounded-lg font-medium hover:bg-[#3a3f4a] transition-colors">
+                Recalculate
+              </button>
+              <button id="generate-ofp-btn" class="px-6 py-3 bg-[#2563eb] text-white rounded-lg font-medium hover:bg-[#1d4ed8] transition-colors">
+                Generate OFP
+              </button>
+            </div>
+          </div>
+          
+          <!-- Enhanced Performance Display -->
+          <div class="bg-gradient-to-r from-[#20242d] to-[#1a1e26] rounded-xl p-8 border-2 border-[#16a34a]/30 shadow-lg">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-12">
+              <!-- HOGE Display -->
+              <div class="text-center">
+                <div class="mb-4">
+                  <div class="w-16 h-16 bg-[#2563eb]/20 rounded-full flex items-center justify-center mx-auto mb-3 border-2 border-[#2563eb]/50">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="#2563eb" viewBox="0 0 256 256">
+                      <path d="M208,32H184V24a8,8,0,0,0-16,0v8H88V24a8,8,0,0,0-16,0v8H48A16,16,0,0,0,32,48V208a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V48A16,16,0,0,0,208,32ZM72,48v8a8,8,0,0,0,16,0V48h80v8a8,8,0,0,0,16,0V48h24V80H48V48ZM208,208H48V96H208V208Z"/>
+                    </svg>
+                  </div>
+                  <h4 class="text-white font-bold text-2xl mb-2">HOGE</h4>
+                  <p class="text-[#a0a9bb] text-base">Hover Out of Ground Effect</p>
+                </div>
+                <div class="bg-[#15181e] rounded-lg p-6 border border-[#2c333f]">
+                  <div id="hoge-value" class="text-[#2563eb] text-5xl font-bold mb-2">-- kg</div>
+                  <div class="text-[#a0a9bb] text-sm uppercase tracking-wide">Calculated Value</div>
+                </div>
+              </div>
+
+              <!-- Payload Display -->
+              <div class="text-center">
+                <div class="mb-4">
+                  <div class="w-16 h-16 bg-[#16a34a]/20 rounded-full flex items-center justify-center mx-auto mb-3 border-2 border-[#16a34a]/50">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="#16a34a" viewBox="0 0 256 256">
+                      <path d="M230.14,70.54,185.46,25.86a20,20,0,0,0-28.28,0L128,55.11,98.82,25.86a20,20,0,0,0-28.28,0L25.86,70.54a20,20,0,0,0,0,28.28L55.11,128,25.86,157.18a20,20,0,0,0,0,28.28l44.68,44.68a20,20,0,0,0,28.28,0L128,200.89l29.18,29.25a20,20,0,0,0,28.28,0l44.68-44.68a20,20,0,0,0,0-28.28L200.89,128l29.25-29.18A20,20,0,0,0,230.14,70.54ZM171.31,44l40,40L181.02,114.34a79.57,79.57,0,0,0-22.68-22.68ZM44,84.69l40-40L114.34,75a79.57,79.57,0,0,0-22.68,22.68ZM84.69,212l-40-40L74.98,141.66a79.57,79.57,0,0,0,22.68,22.68ZM128,172a44,44,0,1,1,44-44A44.05,44.05,0,0,1,128,172Zm43.31,40-30.33-30.34a79.57,79.57,0,0,0,22.68-22.68L194,189.31Z"/>
+                    </svg>
+                  </div>
+                  <h4 class="text-white font-bold text-2xl mb-2">Payload</h4>
+                  <p class="text-[#a0a9bb] text-base">Available Load Capacity</p>
+                </div>
+                <div class="bg-[#15181e] rounded-lg p-6 border border-[#2c333f]">
+                  <div id="payload-value" class="text-[#16a34a] text-5xl font-bold mb-2">-- kg</div>
+                  <div class="text-[#a0a9bb] text-sm uppercase tracking-wide">Available Capacity</div>
+                </div>
+              </div>
+            </div>
+            
+            <!-- Status Indicator -->
+            <div class="mt-8 text-center">
+              <div class="inline-flex items-center gap-2 bg-[#15181e] rounded-full px-4 py-2 border border-[#2c333f]">
+                <div class="w-2 h-2 bg-[#16a34a] rounded-full animate-pulse"></div>
+                <span class="text-[#a0a9bb] text-sm font-medium">Performance calculations ready</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>

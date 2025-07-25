@@ -90,6 +90,91 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('flight-info-panel').classList.remove('hidden');
   });
 
+  // Calculate Panel functionality
+  const calculationPanel = document.getElementById('calculation-panel');
+  
+  // Function to transfer flight info data to calculation panel
+  function transferFlightData() {
+    const picName = document.querySelector('#flight-info-panel input[placeholder="Enter PIC Name"]').value || 'Enter PIC Name';
+    const sicName = document.querySelector('#flight-info-panel input[placeholder="Enter SIC Name"]').value || 'Enter SIC Name';
+    const hopName = document.querySelector('#flight-info-panel input[placeholder="Enter HOP Name"]').value || 'Enter HOP Name';
+    
+    document.getElementById('pic-name-display').textContent = picName;
+    document.getElementById('sic-name-display').textContent = sicName;
+    document.getElementById('hop-name-display').textContent = hopName;
+  }
+
+  // Show calculation section when "Next" button is clicked (the blue button at bottom of flight info panel)
+  document.querySelector('#flight-info-panel button[class*="bg-[#2563eb]"]').addEventListener('click', function() {
+    transferFlightData();
+    calculationPanel.classList.remove('hidden');
+    
+    // Scroll to the calculation panel smoothly
+    setTimeout(() => {
+      calculationPanel.scrollIntoView({ behavior: 'smooth' });
+    }, 100);
+  });
+
+  // Function to calculate fuel requirements
+  function calculateFuel() {
+    // Fixed values
+    const taxiFuel = 60; // kg
+    const finalReserveFuel = 120; // kg (30 min)
+    const extrasFuel = 80; // kg
+    
+    // Calculated values (mock calculations for now)
+    const tripDuration = 45; // minutes - will be calculated from route
+    const tripFuel = Math.round(tripDuration * 2.5); // kg - mock fuel consumption rate
+    
+    // Contingency: 10% of trip fuel
+    const contingencyFuel = Math.round(tripFuel * 0.1);
+    const contingencyDuration = Math.round(tripDuration * 0.1);
+    
+    // Discretion fuel (user input)
+    const discretionFuel = parseInt(document.getElementById('discretion-fuel').value) || 50;
+    
+    // Total fuel
+    const totalFuel = taxiFuel + tripFuel + finalReserveFuel + contingencyFuel + extrasFuel + discretionFuel;
+    
+    // Update UI
+    document.getElementById('trip-duration').textContent = `${tripDuration} min`;
+    document.getElementById('trip-fuel').textContent = `${tripFuel} kg`;
+    document.getElementById('contingency-duration').textContent = `${contingencyDuration} min`;
+    document.getElementById('contingency-fuel').textContent = `${contingencyFuel} kg`;
+    document.getElementById('total-fuel').textContent = `${totalFuel} kg`;
+    
+    return totalFuel;
+  }
+
+  // Recalculate button functionality
+  document.getElementById('recalculate-btn').addEventListener('click', function() {
+    // Fuel calculations
+    calculateFuel();
+    
+    // Performance calculations
+    const hogeValue = document.getElementById('hoge-value');
+    const payloadValue = document.getElementById('payload-value');
+    
+    // Mock calculation - replace with actual logic later
+    const totalCrewWeight = (parseInt(document.getElementById('pic-weight').value) || 75) +
+                           (parseInt(document.getElementById('sic-weight').value) || 75) +
+                           (parseInt(document.getElementById('hop-weight').value) || 75);
+    
+    hogeValue.textContent = `${2500 - totalCrewWeight} kg`;
+    payloadValue.textContent = `${1800 - totalCrewWeight} kg`;
+  });
+
+  // Auto-calculate fuel when discretion fuel changes
+  document.getElementById('discretion-fuel').addEventListener('input', function() {
+    calculateFuel();
+  });
+
+  // Generate OFP button functionality
+  document.getElementById('generate-ofp-btn').addEventListener('click', function() {
+    // Placeholder for OFP generation
+    alert('OFP Generation functionality will be implemented here');
+  });
+
   // Load and parse KML file
   loadWaypoints();
 
