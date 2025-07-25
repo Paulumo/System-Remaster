@@ -75,10 +75,10 @@ document.addEventListener('DOMContentLoaded', function() {
     button.addEventListener('click', function() {
       // Reset all buttons to inactive state
       flightMethodButtons.forEach(btn => {
-        btn.className = 'flex min-w-[84px] cursor-pointer items-center justify-center overflow-hidden rounded-lg h-10 px-3 bg-[#2a2f3a] text-white text-sm font-bold leading-normal hover:bg-[#3a3f4a] transition-colors';
+        btn.className = 'flex min-w-[84px] cursor-pointer items-center justify-center overflow-hidden rounded-lg h-10 px-3 bg-[#2a2f3a] text-white text-sm font-bold leading-normal hover:bg-[#3a3f4a] transition-colors tracking-widest';
       });
       // Set clicked button to active state
-      this.className = 'flex min-w-[84px] cursor-pointer items-center justify-center overflow-hidden rounded-lg h-10 px-3 bg-[#1a2741] text-white text-sm font-bold leading-normal hover:bg-[#1e2d4a] transition-colors';
+      this.className = 'flex min-w-[84px] cursor-pointer items-center justify-center overflow-hidden rounded-lg h-10 px-3 bg-[#b1ccff] text-black text-sm font-bold leading-normal hover:bg-[#7b8eb2] transition-colors tracking-widest';
     });
   });
 
