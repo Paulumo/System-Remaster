@@ -10,18 +10,167 @@
     />
 
     <title>PMO Design</title>
-    <link rel="icon" type="image/png" href="./src/pixelated.png" />
+    <link rel="icon" type="image/png" href="./icon/pixelated.png" />
 
     <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <style>
+      /* Drag and drop styles */
+      .waypoint-dragging {
+        opacity: 0.5;
+        transform: rotate(2deg);
+      }
+      
+      .waypoint-drag-over {
+        background: #1a2741 !important;
+        transform: scale(1.02);
+        transition: all 0.2s ease;
+      }
+      
+      .waypoint-item {
+        transition: all 0.2s ease;
+      }
+      
+      .waypoint-item:hover {
+        transform: translateX(2px);
+      }
+      
+      .waypoint-name:hover {
+        color: #2563eb !important;
+      }
+      
+      .waypoint-item img {
+        flex-shrink: 0;
+      }
+      
+      /* Waypoint popup styles */
+      .waypoint-popup {
+        font-family: 'Space Grotesk', 'Noto Sans', sans-serif;
+        min-width: 200px;
+      }
+      
+      .waypoint-name {
+        font-weight: bold;
+        font-size: 14px;
+        color: #1a2741;
+        margin-bottom: 4px;
+      }
+      
+      .waypoint-coords {
+        font-size: 12px;
+        color: #666;
+        margin-bottom: 2px;
+      }
+      
+      .waypoint-desc {
+        font-size: 12px;
+        color: #888;
+        margin: 8px 0;
+        font-style: italic;
+      }
+      
+      .add-to-route-btn {
+        background: #2563eb;
+        color: white;
+        border: none;
+        padding: 6px 12px;
+        border-radius: 6px;
+        font-size: 12px;
+        font-weight: 500;
+        cursor: pointer;
+        margin-top: 8px;
+        width: 100%;
+        transition: background-color 0.2s ease;
+      }
+      
+      .add-to-route-btn:hover {
+        background: #1d4ed8;
+      }
+      
+      /* Search results styles */
+      .search-results-dropdown {
+        scrollbar-width: thin;
+        scrollbar-color: #2c333f #20242d;
+      }
+      
+      .search-results-dropdown::-webkit-scrollbar {
+        width: 6px;
+      }
+      
+      .search-results-dropdown::-webkit-scrollbar-track {
+        background: #20242d;
+      }
+      
+      .search-results-dropdown::-webkit-scrollbar-thumb {
+        background: #2c333f;
+        border-radius: 3px;
+      }
+      
+      .search-result-item {
+        padding: 12px 16px;
+        border-bottom: 1px solid #2c333f;
+        cursor: pointer;
+        transition: background-color 0.2s ease;
+      }
+      
+      .search-result-item:hover {
+        background: #2a2f3a;
+      }
+      
+      .search-result-item:last-child {
+        border-bottom: none;
+      }
+      
+      .search-result-name {
+        font-weight: 500;
+        color: #ffffff;
+        font-size: 14px;
+        margin-bottom: 4px;
+      }
+      
+      .search-result-coords {
+        font-size: 12px;
+        color: #a0a9bb;
+        margin-bottom: 2px;
+      }
+      
+      .search-result-desc {
+        font-size: 11px;
+        color: #888;
+        font-style: italic;
+        margin-top: 4px;
+      }
+      
+      .search-no-results {
+        padding: 16px;
+        text-align: center;
+        color: #a0a9bb;
+        font-size: 14px;
+      }
+      
+      /* Custom leaflet popup styles */
+      .leaflet-popup-content-wrapper {
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+      }
+      
+      .leaflet-popup-content {
+        margin: 12px 14px;
+      }
+      
+      .leaflet-popup-tip {
+        background: white;
+      }
+    </style>
   </head>
   <body>
     <div class="relative flex size-full min-h-screen flex-col bg-[#15181e] dark group/design-root overflow-x-hidden" style='font-family: "Space Grotesk", "Noto Sans", sans-serif;'>
       <div class="layout-container flex h-full grow flex-col">
         <header class="flex items-center justify-between whitespace-nowrap border-b border-solid border-b-[#2c333f] px-10 py-2">
           <div class="flex items-center gap-4 text-white">
-            <img alt="logo" class="max-w-20" src="./src/pixelated.png">
+            <img alt="logo" class="max-w-20" src="./icon/pixelated.png">
             <h2 class="text-white text-lg font-bold leading-tight tracking-[-0.015em]">HeliServer</h2>
           </div>
           <div class="flex flex-1 justify-end gap-8">
@@ -40,10 +189,18 @@
               <p class="text-white tracking-light text-[32px] font-bold leading-tight min-w-72">Flight Planning</p>
             </div>
             <h3 class="text-white text-lg font-bold leading-tight tracking-[-0.015em] px-4 pb-2 pt-4">Planned Route</h3>
+            <div id="waypoint-counter" class="px-4 pb-2">
+              <span class="text-[#a0a9bb] text-sm">Loading waypoints...</span>
+            </div>
             
             <!-- Waypoint items with light background -->
-            <div class="flex items-center gap-4 bg-[#2a2f3a] mx-4 mb-2 rounded-lg px-4 min-h-14 justify-between">
-              <p class="text-white text-base font-normal leading-normal flex-1 truncate">RCMQ</p>
+            <div class="waypoint-item flex items-center gap-4 bg-[#2a2f3a] mx-4 mb-2 rounded-lg px-4 min-h-14 justify-between">
+              <div class="drag-handle text-[#a0a9bb] mr-2 cursor-grab">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16px" height="16px" fill="currentColor" viewBox="0 0 256 256">
+                  <path d="M 104 64 a 8 8 0 0 1 8 -8 h 378 a 8 8 0 0 1 0 16 H 112 A 8 8 0 0 1 104 64 Z m 8 56 h 382 a 8 8 0 0 0 0 -16 H 112 a 8 8 0 0 0 0 16 Z m 32 32 H 112 a 8 8 0 0 0 0 16 h 139 a 8 8 0 0 0 0 -16 Z m 0 40 H 112 a 8 8 0 0 0 0 16 h 385 a 8 8 0 0 0 0 -16 Z"></path>
+                </svg>
+              </div>
+              <p class="text-white text-base font-normal leading-normal flex-1 truncate font-bold tetx-lg">RCMQ</p>
               <div class="shrink-0">
                 <div class="text-white flex size-7 items-center justify-center hover:bg-[#3a3f4a] rounded cursor-pointer" data-icon="X" data-size="24px" data-weight="regular">
                   <svg xmlns="http://www.w3.org/2000/svg" width="24px" height="24px" fill="currentColor" viewBox="0 0 256 256">
@@ -55,8 +212,8 @@
               </div>
             </div>
             
-            <div class="flex items-center gap-4 bg-[#2a2f3a] mx-4 mb-2 rounded-lg px-4 min-h-14 justify-between">
-              <p class="text-white text-base font-normal leading-normal flex-1 truncate">DADU</p>
+            <div class="waypoint-item flex items-center gap-4 bg-[#2a2f3a] mx-4 mb-2 rounded-lg px-4 min-h-14 justify-between">
+              <p class="text-white text-base font-normal leading-normal flex-1 truncate">Dadu</p>
               <div class="shrink-0">
                 <div class="text-white flex size-7 items-center justify-center hover:bg-[#3a3f4a] rounded cursor-pointer" data-icon="X" data-size="24px" data-weight="regular">
                   <svg xmlns="http://www.w3.org/2000/svg" width="24px" height="24px" fill="currentColor" viewBox="0 0 256 256">
@@ -68,7 +225,7 @@
               </div>
             </div>
             
-            <div class="flex items-center gap-4 bg-[#2a2f3a] mx-4 mb-2 rounded-lg px-4 min-h-14 justify-between">
+            <div class="waypoint-item flex items-center gap-4 bg-[#2a2f3a] mx-4 mb-2 rounded-lg px-4 min-h-14 justify-between">
               <p class="text-white text-base font-normal leading-normal flex-1 truncate">CH1A07</p>
               <div class="shrink-0">
                 <div class="text-white flex size-7 items-center justify-center hover:bg-[#3a3f4a] rounded cursor-pointer" data-icon="X" data-size="24px" data-weight="regular">
@@ -81,8 +238,8 @@
               </div>
             </div>
             
-            <div class="flex items-center gap-4 bg-[#2a2f3a] mx-4 mb-2 rounded-lg px-4 min-h-14 justify-between">
-              <p class="text-white text-base font-normal leading-normal flex-1 truncate">DADU</p>
+            <div class="waypoint-item flex items-center gap-4 bg-[#2a2f3a] mx-4 mb-2 rounded-lg px-4 min-h-14 justify-between">
+              <p class="text-white text-base font-normal leading-normal flex-1 truncate">Dadu</p>
               <div class="shrink-0">
                 <div class="text-white flex size-7 items-center justify-center hover:bg-[#3a3f4a] rounded cursor-pointer" data-icon="X" data-size="24px" data-weight="regular">
                   <svg xmlns="http://www.w3.org/2000/svg" width="24px" height="24px" fill="currentColor" viewBox="0 0 256 256">
@@ -94,7 +251,7 @@
               </div>
             </div>
             
-            <div class="flex items-center gap-4 bg-[#2a2f3a] mx-4 mb-2 rounded-lg px-4 min-h-14 justify-between">
+            <div class="waypoint-item flex items-center gap-4 bg-[#2a2f3a] mx-4 mb-2 rounded-lg px-4 min-h-14 justify-between">
               <p class="text-white text-base font-normal leading-normal flex-1 truncate">RCMQ</p>
               <div class="shrink-0">
                 <div class="text-white flex size-7 items-center justify-center hover:bg-[#3a3f4a] rounded cursor-pointer" data-icon="X" data-size="24px" data-weight="regular">
@@ -280,63 +437,7 @@
       </div>
     </div>
 
-    <script>
-      document.addEventListener('DOMContentLoaded', function() {
-        // Initialize the map
-        // var map = L.map('map').setView([24.262119465616294, 120.62441809570404], 7.6);
-        var map = L.map('map').setView([23.973861, 120.982000], 7.6);
-        
-        // Use MapTiler DataViz Light style
-        // Since we can't directly access L.maptiler, we'll use a light-themed tile layer
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-          maxZoom: 19,
-          attribution: '© <a href="https://carto.com/attributions">CARTO</a> © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-        }).addTo(map);
-
-        // Add custom zoom controls functionality
-        document.querySelector('[data-icon="Plus"]').parentElement.addEventListener('click', function() {
-          map.zoomIn();
-        });
-
-        document.querySelector('[data-icon="Minus"]').parentElement.addEventListener('click', function() {
-          map.zoomOut();
-        });
-
-        // Add location functionality
-        document.querySelector('[data-icon="NavigationArrow"]').parentElement.addEventListener('click', function() {
-          if (navigator.geolocation) {
-            navigator.geolocation.getCurrentPosition(function(position) {
-              var lat = position.coords.latitude;
-              var lng = position.coords.longitude;
-              map.setView([lat, lng], 15);
-              L.marker([lat, lng]).addTo(map)
-                .bindPopup('Your current location')
-                .openPopup();
-            });
-          }
-        });
-
-        // Flight Method button functionality
-        const flightMethodButtons = document.querySelectorAll('.mb-6 .flex.gap-2 button');
-        flightMethodButtons.forEach(button => {
-          button.addEventListener('click', function() {
-            // Reset all buttons to inactive state
-            flightMethodButtons.forEach(btn => {
-              btn.className = 'flex min-w-[84px] cursor-pointer items-center justify-center overflow-hidden rounded-lg h-10 px-3 bg-[#2a2f3a] text-white text-sm font-bold leading-normal hover:bg-[#3a3f4a] transition-colors';
-            });
-            // Set clicked button to active state
-            this.className = 'flex min-w-[84px] cursor-pointer items-center justify-center overflow-hidden rounded-lg h-10 px-3 bg-[#1a2741] text-white text-sm font-bold leading-normal hover:bg-[#1e2d4a] transition-colors';
-          });
-        });
-
-        // Disable default zoom controls since we have custom ones
-        map.zoomControl.remove();
-
-        // Show right panel on 'Continue with OFP' click
-        document.getElementById('continue-ofp-btn').addEventListener('click', function() {
-          document.getElementById('flight-info-panel').classList.remove('hidden');
-        });
-      });
+    <script src="script.js">
     </script>
   </body>
 </html>
