@@ -1897,6 +1897,24 @@
 				</Point>
 			</Placemark>
 			<Placemark>
+				<name>RCMQ</name>
+				<description>Ching Chuang Kang Air Base</description>
+				<LookAt>
+					<longitude>120.62439663817632</longitude>
+					<latitude>24.262109684402887</latitude>
+					<altitude>0</altitude>
+					<heading>-0.1974042010898865</heading>
+					<tilt>0</tilt>
+					<range>5953.597814950122</range>
+					<gx:altitudeMode>relativeToSeaFloor</gx:altitudeMode>
+				</LookAt>
+				<styleUrl>#m_ylw-pushpin102</styleUrl>
+				<Point>
+					<gx:drawOrder>1</gx:drawOrder>
+					<coordinates>120.62439663817632,24.262109684402887,0</coordinates>
+				</Point>
+			</Placemark>
+			<Placemark>
 				<name>Dadu</name>
 				<description>Dadu River Mouth</description>
 				<LookAt>

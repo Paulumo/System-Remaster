@@ -41,6 +41,34 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   });
 
+  // Cancel button functionality for waypoint items
+  function setupCancelButtons() {
+    const cancelButtons = document.querySelectorAll('.waypoint-item .shrink-0 div[data-icon="X"]');
+    cancelButtons.forEach(button => {
+      button.addEventListener('click', function() {
+        // Remove the waypoint item
+        const waypointItem = this.closest('.waypoint-item');
+        if (waypointItem) {
+          waypointItem.remove();
+          updateWaypointCounter();
+        }
+      });
+    });
+  }
+
+  // Update waypoint counter
+  function updateWaypointCounter() {
+    const waypointItems = document.querySelectorAll('.waypoint-item');
+    const counter = document.getElementById('waypoint-counter');
+    const count = waypointItems.length;
+    
+    counter.innerHTML = `<span class="text-[#a0a9bb] text-sm">${count} waypoint${count !== 1 ? 's' : ''} have been loaded</span>`;
+  }
+
+  // Initialize cancel buttons and waypoint counter
+  setupCancelButtons();
+  updateWaypointCounter();
+
   // Flight Method button functionality
   const flightMethodButtons = document.querySelectorAll('.mb-6 .flex.gap-2 button');
   flightMethodButtons.forEach(button => {
@@ -105,7 +133,7 @@ async function loadWaypoints() {
           if (!isNaN(lat) && !isNaN(lng)) {
             // Determine category based on name patterns
             let category = 'Flight Point';
-            if (name.match(/^(F1|F2|CH1|CH2|CF|TP1|TP2|ZN|YL)/)) {
+            if (name.match(/^(F1|F2|CH1|CH2|CF|TP|ZN|YL|XD)/)) {
               category = 'Wind Turbines';
             }
             
@@ -348,11 +376,11 @@ function addToRoute(name, lat, lng) {
         <path d="M104,64a8,8,0,0,1,8-8h32a8,8,0,0,1,0,16H112A8,8,0,0,1,104,64Zm8,56h32a8,8,0,0,0,0-16H112a8,8,0,0,0,0,16Zm32,32H112a8,8,0,0,0,0,16h32a8,8,0,0,0,0-16Zm0,40H112a8,8,0,0,0,0,16h32a8,8,0,0,0,0-16Z"></path>
       </svg>
     </div>
-    <img src="${iconPath}" alt="${category}" class="w-5 h-5 mr-2" />
-    <p class="text-white text-base font-normal leading-normal flex-1 truncate cursor-pointer waypoint-name">${name}</p>
+    <img src="${iconPath}" alt="Tag" class="w-4 h-4 flex-shrink-0" />
+    <p class="text-white text-base font-bold leading-normal flex-1 truncate cursor-pointer waypoint-name">${name}</p>
     <div class="shrink-0">
-      <div class="text-white flex size-7 items-center justify-center hover:bg-[#3a3f4a] rounded cursor-pointer remove-waypoint" data-waypoint="${name}" data-icon="X" data-size="24px" data-weight="regular">
-        <svg xmlns="http://www.w3.org/2000/svg" width="24px" height="24px" fill="currentColor" viewBox="0 0 256 256">
+      <div class="text-white flex size-7 items-center justify-center hover:bg-[#3a3f4a] rounded cursor-pointer remove-waypoint" data-waypoint="${name}" data-icon="X" data-size="20px" data-weight="regular">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20px" height="20px" fill="currentColor" viewBox="0 0 256 256">
           <path d="M205.66,194.34a8,8,0,0,1-11.32,11.32L128,139.31,61.66,205.66a8,8,0,0,1-11.32-11.32L116.69,128,50.34,61.66A8,8,0,0,1,61.66,50.34L128,116.69l66.34-66.35a8,8,0,0,1,11.32,11.32L139.31,128Z"></path>
         </svg>
       </div>
@@ -362,12 +390,14 @@ function addToRoute(name, lat, lng) {
   // Add click handler for remove button
   waypointElement.querySelector('.remove-waypoint').addEventListener('click', function(e) {
     e.stopPropagation();
+    // Remove the waypoint item
+    waypointElement.remove();
     // Remove from planned route array
     const index = plannedRoute.findIndex(wp => wp.name === name);
     if (index > -1) {
       plannedRoute.splice(index, 1);
     }
-    waypointElement.remove();
+    updateWaypointCounter();
   });
   
   // Add click handler for waypoint name to zoom to location
@@ -379,6 +409,9 @@ function addToRoute(name, lat, lng) {
   // Insert before the "Continue with OFP" button
   const continueButton = document.getElementById('continue-ofp-btn').parentElement;
   continueButton.parentNode.insertBefore(waypointElement, continueButton);
+  
+  // Update waypoint counter
+  updateWaypointCounter();
   
   // Close the popup
   map.closePopup();
