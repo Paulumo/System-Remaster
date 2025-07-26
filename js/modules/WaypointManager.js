@@ -28,7 +28,7 @@ export class WaypointManager {
     try {
       await this.loadWaypoints();
       this.displayWaypoints();
-      this.initializeExistingWaypoints();
+      this.generateDefaultRoute();
       this.updateWaypointCounter();
       this.setupStateSubscriptions();
       
@@ -348,6 +348,27 @@ export class WaypointManager {
   }
 
   /**
+   * Add waypoint to planned route (internal method without UI notifications)
+   * @private
+   * @param {Object} waypoint - Waypoint to add
+   * @returns {boolean} True if waypoint was added successfully
+   */
+  addToRouteInternal(waypoint) {
+    try {
+      // Dispatch state update
+      stateManager.dispatch('ADD_WAYPOINT_TO_ROUTE', waypoint);
+      
+      // Create waypoint element in sidebar
+      this.createRouteWaypointElement(waypoint);
+      
+      return true;
+    } catch (error) {
+      console.error('Error adding waypoint to route:', error);
+      return false;
+    }
+  }
+
+  /**
    * Add waypoint to planned route
    * @param {Object} waypoint - Waypoint to add
    */
@@ -358,16 +379,19 @@ export class WaypointManager {
       // DEVELOPMENT: Allow duplicate waypoints for helicopter operations
       // (helicopters often depart/arrive at same location or use same flight points)
       
-      // Dispatch state update
-      stateManager.dispatch('ADD_WAYPOINT_TO_ROUTE', waypoint);
+      const success = this.addToRouteInternal(waypoint);
       
-      // Create waypoint element in sidebar
-      this.createRouteWaypointElement(waypoint);
-      
-      // Close popup
-      this.mapManager.closePopups();
-      
-      this.showMessage(CONFIG.SUCCESS.WAYPOINT_ADDED, 'success');
+      if (success) {
+        // Close popup
+        this.mapManager.closePopups();
+        
+        this.showMessage(CONFIG.SUCCESS.WAYPOINT_ADDED, 'success');
+        
+        // Update critical point dropdown
+        this.updateCriticalPointDropdown();
+      } else {
+        this.showError('Failed to add waypoint to route');
+      }
       
     } catch (error) {
       console.error('Error adding waypoint to route:', error);
@@ -388,6 +412,9 @@ export class WaypointManager {
         
         this.showMessage(CONFIG.SUCCESS.WAYPOINT_REMOVED, 'success');
         console.log(`Removed ${waypoint.name} from route`);
+        
+        // Update critical point dropdown
+        this.updateCriticalPointDropdown();
       }
     } catch (error) {
       console.error('Error removing waypoint from route:', error);
@@ -513,6 +540,49 @@ export class WaypointManager {
         console.error('Error enhancing existing waypoint:', error);
       }
     });
+  }
+
+  /**
+   * Generate default route with predefined waypoints
+   * Route: RCMQ → Dadu → CH1A07 → Dadu → RCMQ
+   * @private
+   */
+  generateDefaultRoute() {
+    try {
+      console.log('Generating default route...');
+      
+      // Default route waypoint names in order
+      const defaultWaypoints = ['RCMQ', 'Dadu', 'CH1A07', 'Dadu', 'RCMQ'];
+      
+      // Add each waypoint to route
+      defaultWaypoints.forEach((waypointName, index) => {
+        const waypointData = this.waypointsData.find(wp => wp.name === waypointName);
+        if (waypointData) {
+          // Create a unique waypoint instance with sequence number for duplicates
+          const routeWaypoint = {
+            ...waypointData,
+            id: `${waypointData.id}_${index}`, // Make unique ID for duplicates
+            sequenceNumber: index + 1,
+            originalId: waypointData.id
+          };
+          
+          // Add to route without triggering critical point update for each waypoint
+          const waypointAddedWithoutUpdate = this.addToRouteInternal(routeWaypoint);
+          if (waypointAddedWithoutUpdate) {
+            console.log(`✅ Added ${waypointName} to default route (${index + 1}/${defaultWaypoints.length})`);
+          }
+        } else {
+          console.warn(`⚠️ Waypoint data not found for: ${waypointName}`);
+        }
+      });
+      
+      // Update critical point dropdown once after all waypoints are added
+      this.updateCriticalPointDropdown();
+      
+      console.log(`✅ Default route generated with ${defaultWaypoints.length} waypoints`);
+    } catch (error) {
+      console.error('❌ Error generating default route:', error);
+    }
   }
 
   /**
@@ -733,7 +803,51 @@ export class WaypointManager {
     });
     
     this.updateWaypointCounter();
+    this.updateCriticalPointDropdown();
     this.showMessage('Route cleared', 'info');
+  }
+
+  /**
+   * Update critical point dropdown with current route waypoints
+   */
+  updateCriticalPointDropdown() {
+    const dropdown = domCache.get('#critical-point');
+    if (!dropdown) return;
+    
+    try {
+      // Clear existing options except the first one
+      dropdown.innerHTML = '<option value="">Select...</option>';
+      
+      // Populate with current route waypoints
+      this.plannedRoute.forEach((waypoint, index) => {
+        const option = createElement('option', {
+          value: waypoint.id
+        }, `${index + 1}. ${waypoint.name}`);
+        dropdown.appendChild(option);
+      });
+      
+      // Set default to middle waypoint if route has waypoints
+      if (this.plannedRoute.length >= 3) {
+        const middleIndex = Math.floor(this.plannedRoute.length / 2);
+        const middleWaypoint = this.plannedRoute[middleIndex];
+        dropdown.value = middleWaypoint.id;
+      }
+      
+      console.log(`Updated critical point dropdown with ${this.plannedRoute.length} waypoints`);
+    } catch (error) {
+      console.error('Error updating critical point dropdown:', error);
+    }
+  }
+
+  /**
+   * Get selected critical point waypoint
+   * @returns {Object|null} Selected critical point waypoint data
+   */
+  getSelectedCriticalPoint() {
+    const dropdown = domCache.get('#critical-point');
+    if (!dropdown || !dropdown.value) return null;
+    
+    return this.plannedRoute.find(waypoint => waypoint.id === dropdown.value) || null;
   }
 
   /**

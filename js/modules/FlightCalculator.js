@@ -1,14 +1,23 @@
 /**
  * FlightCalculator - Handles flight performance calculations
  * Manages fuel calculations, weight and balance, and performance computations
+ * Integrates NavigationCalculator, FuelCalculator, and PerformanceCalculator
  */
 
 import { CONFIG } from '../config.js';
 import { domCache } from './utils/dom.js';
 import { validateCrewWeight, validateWeatherData, validateFuelAmount } from './utils/validation.js';
+import { NavigationCalculator } from './NavigationCalculator.js';
+import { FuelCalculator } from './FuelCalculator.js';
+import { PerformanceCalculator } from './PerformanceCalculator.js';
 
 export class FlightCalculator {
   constructor() {
+    // Initialize calculation engines
+    this.navigationCalculator = new NavigationCalculator();
+    this.fuelCalculator = new FuelCalculator();
+    this.performanceCalculator = new PerformanceCalculator();
+    
     this.flightData = {
       crew: {
         pic: { name: '', weight: CONFIG.FLIGHT.DEFAULT_CREW_WEIGHT },
@@ -32,14 +41,27 @@ export class FlightCalculator {
       },
       route: {
         waypoints: [],
+        legs: [],
         totalDistance: 0,
-        estimatedTime: 0
+        totalFlightTime: 0,
+        waypointFuelData: []
       },
       performance: {
+        dom: 0,
         hoge: 0,
-        payload: 0,
-        totalWeight: 0
+        payloadAvailable: 0,
+        payloadUsed: 0,
+        fuelAtCriticalPoint: 0,
+        criticalPointAnalysis: {}
       }
+    };
+    
+    // Store last calculation results for debugging
+    this.lastCalculationResults = {
+      navigation: null,
+      fuel: null,
+      performance: null,
+      timestamp: null
     };
     
     this.isInitialized = false;
@@ -106,7 +128,7 @@ export class FlightCalculator {
   }
 
   /**
-   * Update weather data
+   * Update weather data with real-time recalculation
    * @param {Object} weatherData - Weather data
    * @returns {Object} Validation result
    */
@@ -136,9 +158,14 @@ export class FlightCalculator {
         }
       });
       
-      // Recalculate fuel and performance
-      this.calculateFuel();
-      this.calculatePerformance();
+      // Recalculate route with new wind data (if route exists)
+      if (this.flightData.route.waypoints.length >= 2) {
+        this.updateRouteData(this.flightData.route.waypoints);
+      } else {
+        // Just recalculate fuel and performance
+        this.calculateFuel();
+        this.calculatePerformance();
+      }
       
       return { success: true };
       
@@ -152,23 +179,41 @@ export class FlightCalculator {
   }
 
   /**
-   * Update route data
-   * @param {Array} waypoints - Array of waypoint objects
+   * Update route data with comprehensive navigation calculations
+   * @param {Array} waypoints - Array of waypoint objects {name, lat, lng}
    */
   updateRouteData(waypoints) {
     try {
       this.flightData.route.waypoints = [...waypoints];
       
-      // Calculate route distance and time
-      const { distance, time } = this.calculateRouteMetrics(waypoints);
-      this.flightData.route.totalDistance = distance;
-      this.flightData.route.estimatedTime = time;
+      if (waypoints.length < 2) {
+        // Reset route data if insufficient waypoints
+        this.flightData.route.legs = [];
+        this.flightData.route.totalDistance = 0;
+        this.flightData.route.totalFlightTime = 0;
+        this.flightData.route.waypointFuelData = [];
+        return;
+      }
       
-      // Recalculate fuel based on new route
+      // Calculate complete route with wind corrections
+      const windData = {
+        speed: this.flightData.weather.windSpeed,
+        direction: this.flightData.weather.windDirection
+      };
+      
+      const routeCalculation = this.navigationCalculator.calculateCompleteRoute(waypoints, windData);
+      this.lastCalculationResults.navigation = routeCalculation;
+      
+      // Update route data
+      this.flightData.route.legs = routeCalculation.legs;
+      this.flightData.route.totalDistance = routeCalculation.summary.totalDistance; // NM
+      this.flightData.route.totalFlightTime = routeCalculation.summary.totalFlightTime; // minutes
+      
+      // Recalculate fuel and performance based on new route
       this.calculateFuel();
       this.calculatePerformance();
       
-      console.log(`Route updated: ${waypoints.length} waypoints, ${distance.toFixed(1)} km, ${time.toFixed(0)} min`);
+      console.log(`Route updated: ${waypoints.length} waypoints, ${routeCalculation.summary.totalDistance.toFixed(1)} NM, ${routeCalculation.summary.totalFlightTime} min`);
       
     } catch (error) {
       console.error('Error updating route data:', error);
@@ -176,108 +221,158 @@ export class FlightCalculator {
   }
 
   /**
-   * Calculate route metrics (distance and time)
+   * Find critical waypoint (wind turbine) in the route
    * @private
-   * @param {Array} waypoints - Array of waypoints
-   * @returns {Object} Distance in km and time in minutes
+   * @returns {string} Critical waypoint name or empty string
    */
-  calculateRouteMetrics(waypoints) {
-    if (waypoints.length < 2) {
-      return { distance: 0, time: 0 };
-    }
-    
-    let totalDistance = 0;
-    
-    for (let i = 0; i < waypoints.length - 1; i++) {
-      const distance = this.calculateDistance(
-        waypoints[i].lat, waypoints[i].lng,
-        waypoints[i + 1].lat, waypoints[i + 1].lng
+  findCriticalWaypoint() {
+    try {
+      const waypoints = this.flightData.route.waypoints;
+      
+      // Look for wind turbine pattern (e.g., CH1A07, TW1B23, etc.)
+      const turbinePattern = /[A-Z]+\d+[A-Z]\d+/;
+      
+      const criticalWaypoint = waypoints.find(wp => 
+        turbinePattern.test(wp.name)
       );
-      totalDistance += distance;
+      
+      return criticalWaypoint ? criticalWaypoint.name : '';
+      
+    } catch (error) {
+      console.error('Error finding critical waypoint:', error);
+      return '';
     }
-    
-    // Estimate flight time based on average helicopter speed (120 km/h)
-    const averageSpeed = 120; // km/h
-    const estimatedTime = (totalDistance / averageSpeed) * 60; // minutes
-    
-    return {
-      distance: totalDistance,
-      time: estimatedTime
-    };
   }
 
   /**
-   * Calculate distance between two coordinates using Haversine formula
-   * @private
-   * @param {number} lat1 - First point latitude
-   * @param {number} lng1 - First point longitude
-   * @param {number} lat2 - Second point latitude
-   * @param {number} lng2 - Second point longitude
-   * @returns {number} Distance in kilometers
+   * Calculate task specialist loading
+   * @param {Array} taskSpecialists - Array of task specialist data
+   * @returns {Object} Loading calculation result
    */
-  calculateDistance(lat1, lng1, lat2, lng2) {
-    const R = 6371; // Earth's radius in km
-    const dLat = this.toRadians(lat2 - lat1);
-    const dLng = this.toRadians(lng2 - lng1);
-    
-    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-              Math.cos(this.toRadians(lat1)) * Math.cos(this.toRadians(lat2)) *
-              Math.sin(dLng / 2) * Math.sin(dLng / 2);
-    
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    
-    return R * c;
+  calculateTaskSpecialistLoading(taskSpecialists = []) {
+    try {
+      const availablePayload = this.flightData.performance.payloadAvailable;
+      
+      const loadingResult = this.performanceCalculator.calculateTaskSpecialistLoading(
+        taskSpecialists,
+        availablePayload
+      );
+      
+      // Update payload used
+      this.flightData.performance.payloadUsed = loadingResult.summary.totalSpecialistWeight;
+      
+      return {
+        success: true,
+        loading: loadingResult
+      };
+      
+    } catch (error) {
+      console.error('Error calculating task specialist loading:', error);
+      return {
+        success: false,
+        error: 'Failed to calculate task specialist loading'
+      };
+    }
   }
 
   /**
-   * Convert degrees to radians
-   * @private
-   * @param {number} degrees - Degrees to convert
-   * @returns {number} Radians
+   * Generate comprehensive flight analysis
+   * @returns {Object} Complete flight analysis
    */
-  toRadians(degrees) {
-    return degrees * (Math.PI / 180);
+  generateComprehensiveAnalysis() {
+    try {
+      const performanceData = {
+        domData: this.lastCalculationResults.performance?.dom,
+        hogeData: this.lastCalculationResults.performance?.hoge,
+        payloadData: this.lastCalculationResults.performance?.payload,
+        specialistData: null, // Will be added when specialists are loaded
+        criticalPointData: this.flightData.performance.criticalPointAnalysis
+      };
+      
+      const analysis = this.performanceCalculator.generatePerformanceAnalysis(performanceData);
+      
+      return {
+        success: true,
+        analysis: analysis,
+        flightData: this.getFlightData(),
+        calculations: this.lastCalculationResults
+      };
+      
+    } catch (error) {
+      console.error('Error generating comprehensive analysis:', error);
+      return {
+        success: false,
+        error: 'Failed to generate flight analysis'
+      };
+    }
   }
 
   /**
-   * Calculate fuel requirements
+   * Calculate comprehensive fuel requirements
    * @returns {Object} Fuel calculation results
    */
   calculateFuel() {
     try {
-      const fuel = this.flightData.fuel;
       const route = this.flightData.route;
-      const weather = this.flightData.weather;
+      const totalFlightTime = route.totalFlightTime || 0;
       
-      // Calculate trip fuel based on estimated time
-      const tripTime = route.estimatedTime || 45; // Default 45 minutes if no route
+      if (totalFlightTime === 0) {
+        console.warn('No route data available for fuel calculation');
+        return {
+          success: false,
+          error: 'No route data available'
+        };
+      }
       
-      // Apply weather benefits (wind benefits affect fuel consumption)
-      const weatherFactor = 1 - (weather.windBenefits / 100 * 0.1); // Up to 10% reduction
-      const fuelConsumptionRate = CONFIG.FLIGHT.FUEL_CONSUMPTION_RATE * weatherFactor;
+      // Calculate trip fuel based on actual flight time
+      const tripFuel = this.fuelCalculator.calculateTripFuel(totalFlightTime);
       
-      fuel.trip = Math.round(tripTime * fuelConsumptionRate);
+      // Calculate total fuel with all components
+      const fuelCalculation = this.fuelCalculator.calculateTotalFuel(tripFuel, this.flightData.fuel.discretion);
+      this.lastCalculationResults.fuel = fuelCalculation;
       
-      // Calculate contingency fuel (10% of trip fuel)
-      fuel.contingency = Math.round(fuel.trip * CONFIG.FLIGHT.CONTINGENCY_RATE);
+      // Update flight data with calculated values
+      const breakdown = fuelCalculation.breakdown;
+      this.flightData.fuel = {
+        taxi: breakdown.taxiFuel,
+        trip: breakdown.tripFuel,
+        finalReserve: breakdown.finalReserveFuel,
+        contingency: breakdown.contingencyFuel,
+        extras: breakdown.extrasFuel,
+        discretion: breakdown.discretionFuel,
+        total: fuelCalculation.totalFuel
+      };
       
-      // Calculate total fuel
-      fuel.total = fuel.taxi + fuel.trip + fuel.finalReserve + 
-                  fuel.contingency + fuel.extras + fuel.discretion;
+      // Calculate fuel remaining at each waypoint
+      if (route.legs.length > 0) {
+        const waypointFuelResult = this.fuelCalculator.calculateWaypointFuelRemaining(route.legs, fuelCalculation);
+        this.flightData.route.waypointFuelData = waypointFuelResult.waypointData;
+        
+        // Find critical point fuel (look for wind turbine waypoint)
+        const criticalPointResult = this.fuelCalculator.findCriticalPointFuel(
+          waypointFuelResult.waypointData,
+          this.findCriticalWaypoint()
+        );
+        
+        this.flightData.performance.fuelAtCriticalPoint = criticalPointResult.fuelAtCriticalPoint;
+        this.flightData.performance.criticalPointAnalysis = criticalPointResult;
+      }
       
-      console.log(`Fuel calculated: Trip ${fuel.trip}kg, Total ${fuel.total}kg`);
+      console.log(`Fuel calculated: Trip ${breakdown.tripFuel}kg, Total ${fuelCalculation.totalFuel}kg`);
       
       return {
         success: true,
-        fuel: { ...fuel },
-        tripTime: tripTime
+        fuel: { ...this.flightData.fuel },
+        tripTime: totalFlightTime,
+        waypointFuelData: this.flightData.route.waypointFuelData,
+        criticalPointFuel: this.flightData.performance.fuelAtCriticalPoint
       };
       
     } catch (error) {
       console.error('Error calculating fuel:', error);
       return {
         success: false,
-        error: CONFIG.ERRORS.CALCULATION_ERROR
+        error: CONFIG.ERRORS.CALCULATION_ERROR || 'Fuel calculation failed'
       };
     }
   }
@@ -315,57 +410,75 @@ export class FlightCalculator {
   }
 
   /**
-   * Calculate flight performance (HOGE and payload)
+   * Calculate comprehensive flight performance (DOM, HOGE, and payload)
    * @returns {Object} Performance calculation results
    */
   calculatePerformance() {
     try {
       const crew = this.flightData.crew;
-      const fuel = this.flightData.fuel;
       const weather = this.flightData.weather;
+      const fuelAtCriticalPoint = this.flightData.performance.fuelAtCriticalPoint;
       
-      // Calculate total crew weight
-      const totalCrewWeight = crew.pic.weight + crew.sic.weight + crew.hop.weight;
+      // Calculate DOM (Dry Operating Mass)
+      const crewWeights = {
+        pic: crew.pic.weight,
+        sic: crew.sic.weight,
+        hop: crew.hop.weight
+      };
       
-      // Temperature effect on performance (simplified model)
-      const temperatureEffect = 1 - (weather.temperature - 15) * 0.01; // 1% per degree C above 15°C
-      const densityAltitudeEffect = Math.max(0.8, temperatureEffect);
+      const domCalculation = this.performanceCalculator.calculateDOM(crewWeights);
       
-      // Calculate HOGE (Hover Out of Ground Effect)
-      // Base HOGE minus crew weight and fuel, adjusted for density altitude
-      const hogeBase = CONFIG.FLIGHT.BASE_HOGE * densityAltitudeEffect;
-      const hoge = Math.round(hogeBase - totalCrewWeight - fuel.total);
+      // Calculate HOGE with current conditions
+      const hogeCalculation = this.performanceCalculator.calculateHOGE(
+        weather.temperature,
+        this.performanceCalculator.getAircraftSpecs().pressureAltitude,
+        domCalculation.dom + fuelAtCriticalPoint
+      );
       
       // Calculate available payload
-      // Base payload capacity minus crew weight and fuel
-      const payloadBase = CONFIG.FLIGHT.BASE_PAYLOAD * densityAltitudeEffect;
-      const payload = Math.round(payloadBase - totalCrewWeight - fuel.total);
+      const payloadCalculation = this.performanceCalculator.calculateAvailablePayload(
+        hogeCalculation.hogeWeight,
+        fuelAtCriticalPoint,
+        domCalculation.dom
+      );
       
-      // Calculate total aircraft weight
-      const emptyWeight = 1500; // kg (example empty weight)
-      const totalWeight = emptyWeight + totalCrewWeight + fuel.total;
+      this.lastCalculationResults.performance = {
+        dom: domCalculation,
+        hoge: hogeCalculation,
+        payload: payloadCalculation
+      };
       
       // Update performance data
       this.flightData.performance = {
-        hoge: Math.max(0, hoge),
-        payload: Math.max(0, payload),
-        totalWeight: totalWeight,
-        totalCrewWeight: totalCrewWeight,
-        densityAltitudeEffect: densityAltitudeEffect
+        dom: domCalculation.dom,
+        hoge: hogeCalculation.hogeWeight,
+        payloadAvailable: payloadCalculation.availablePayload,
+        payloadUsed: 0, // Will be updated when task specialists are added
+        fuelAtCriticalPoint: fuelAtCriticalPoint,
+        criticalPointAnalysis: this.flightData.performance.criticalPointAnalysis,
+        // Additional performance data
+        totalCrewWeight: domCalculation.totalCrewWeight,
+        aircraftEmptyWeight: domCalculation.aircraftEmptyWeight,
+        payloadStatus: payloadCalculation.status
       };
       
-      console.log(`Performance calculated: HOGE ${hoge}kg, Payload ${payload}kg`);
+      console.log(`Performance calculated: DOM ${domCalculation.dom}kg, HOGE ${hogeCalculation.hogeWeight}kg, Payload Available ${payloadCalculation.availablePayload}kg`);
       
       return {
         success: true,
-        performance: { ...this.flightData.performance }
+        performance: { ...this.flightData.performance },
+        calculations: {
+          dom: domCalculation,
+          hoge: hogeCalculation,
+          payload: payloadCalculation
+        }
       };
       
     } catch (error) {
       console.error('Error calculating performance:', error);
       return {
         success: false,
-        error: CONFIG.ERRORS.CALCULATION_ERROR
+        error: CONFIG.ERRORS.CALCULATION_ERROR || 'Performance calculation failed'
       };
     }
   }
@@ -400,6 +513,44 @@ export class FlightCalculator {
    */
   getPerformanceData() {
     return { ...this.flightData.performance };
+  }
+
+  /**
+   * Get detailed route analysis
+   * @returns {Object} Route analysis with legs and fuel data
+   */
+  getRouteAnalysis() {
+    return {
+      waypoints: this.flightData.route.waypoints,
+      legs: this.flightData.route.legs,
+      summary: {
+        totalDistance: this.flightData.route.totalDistance,
+        totalFlightTime: this.flightData.route.totalFlightTime,
+        waypointCount: this.flightData.route.waypoints.length
+      },
+      fuelData: this.flightData.route.waypointFuelData,
+      criticalPoint: this.flightData.performance.criticalPointAnalysis
+    };
+  }
+
+  /**
+   * Get calculation engine instances (for advanced usage)
+   * @returns {Object} Calculator instances
+   */
+  getCalculators() {
+    return {
+      navigation: this.navigationCalculator,
+      fuel: this.fuelCalculator,
+      performance: this.performanceCalculator
+    };
+  }
+
+  /**
+   * Get last calculation results (for debugging)
+   * @returns {Object} Last calculation results
+   */
+  getLastCalculationResults() {
+    return { ...this.lastCalculationResults };
   }
 
   /**
@@ -463,7 +614,7 @@ export class FlightCalculator {
   }
 
   /**
-   * Generate flight summary
+   * Generate comprehensive flight summary for OFP
    * @returns {Object} Flight summary data
    */
   generateFlightSummary() {
@@ -472,31 +623,60 @@ export class FlightCalculator {
     return {
       route: {
         waypointCount: data.route.waypoints.length,
-        totalDistance: `${data.route.totalDistance.toFixed(1)} km`,
-        estimatedTime: `${Math.round(data.route.estimatedTime)} min`
+        totalDistance: `${data.route.totalDistance.toFixed(1)} NM`,
+        totalFlightTime: `${data.route.totalFlightTime} min`,
+        legs: data.route.legs.map(leg => ({
+          from: leg.from,
+          to: leg.to,
+          distance: `${leg.distance} NM`,
+          course: `${leg.magneticCourse}°M`,
+          time: `${leg.flightTime} min`
+        })),
+        criticalPoint: data.performance.criticalPointAnalysis.waypoint
       },
       crew: {
         totalWeight: `${data.performance.totalCrewWeight} kg`,
+        dom: `${data.performance.dom} kg`,
         members: Object.entries(data.crew)
           .filter(([_, member]) => member.name)
           .map(([role, member]) => `${role.toUpperCase()}: ${member.name} (${member.weight}kg)`)
       },
       fuel: {
         total: `${data.fuel.total} kg`,
+        minimumRequired: `${data.fuel.total - data.fuel.discretion} kg`,
+        atCriticalPoint: `${data.performance.fuelAtCriticalPoint} kg`,
         breakdown: {
+          taxi: `${data.fuel.taxi} kg`,
           trip: `${data.fuel.trip} kg`,
-          reserves: `${data.fuel.finalReserve + data.fuel.contingency} kg`,
-          other: `${data.fuel.taxi + data.fuel.extras + data.fuel.discretion} kg`
-        }
+          finalReserve: `${data.fuel.finalReserve} kg`,
+          contingency: `${data.fuel.contingency} kg`,
+          extras: `${data.fuel.extras} kg`,
+          discretion: `${data.fuel.discretion} kg`
+        },
+        waypointFuel: data.route.waypointFuelData.map(wp => ({
+          waypoint: wp.waypoint,
+          fuelRemaining: `${wp.fuelRemaining} kg`,
+          time: `${wp.cumulativeTime} min`
+        }))
       },
       performance: {
         hoge: `${data.performance.hoge} kg`,
-        payload: `${data.performance.payload} kg`,
-        totalWeight: `${data.performance.totalWeight} kg`
+        payloadAvailable: `${data.performance.payloadAvailable} kg`,
+        payloadUsed: `${data.performance.payloadUsed} kg`,
+        aircraftEmptyWeight: `${data.performance.aircraftEmptyWeight} kg`,
+        status: data.performance.payloadStatus
       },
       weather: {
-        conditions: `${data.weather.temperature}°C, Wind ${data.weather.windSpeed}kts @ ${data.weather.windDirection}°`,
+        temperature: `${data.weather.temperature}°C`,
+        wind: `${data.weather.windSpeed}kts @ ${data.weather.windDirection}°`,
+        magneticVariation: `${this.navigationCalculator.getMagneticVariation()}°`,
         benefits: `${data.weather.windBenefits}% wind benefits`
+      },
+      calculations: {
+        navigationMethod: 'Great Circle with Wind Corrections',
+        fuelConsumptionRate: `${this.fuelCalculator.getFuelConsumptionRate()} kg/min`,
+        trueAirspeed: `${this.navigationCalculator.getTrueAirspeed()} kts`,
+        pressureAltitude: `${this.performanceCalculator.getAircraftSpecs().pressureAltitude} ft`
       }
     };
   }
@@ -528,14 +708,27 @@ export class FlightCalculator {
       },
       route: {
         waypoints: [],
+        legs: [],
         totalDistance: 0,
-        estimatedTime: 0
+        totalFlightTime: 0,
+        waypointFuelData: []
       },
       performance: {
+        dom: 0,
         hoge: 0,
-        payload: 0,
-        totalWeight: 0
+        payloadAvailable: 0,
+        payloadUsed: 0,
+        fuelAtCriticalPoint: 0,
+        criticalPointAnalysis: {}
       }
+    };
+    
+    // Reset calculation results
+    this.lastCalculationResults = {
+      navigation: null,
+      fuel: null,
+      performance: null,
+      timestamp: null
     };
     
     console.log('Flight calculator reset to defaults');

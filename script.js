@@ -241,6 +241,9 @@ async function loadWaypoints() {
     updateWaypointCounter();
     displayWaypoints();
     
+    // Initialize default waypoints first
+    initializeDefaultWaypoints();
+    
     // Initialize existing waypoints after data is loaded
     initializeExistingWaypoints();
     
@@ -483,6 +486,10 @@ function addToRoute(name, lat, lng) {
       plannedRoute.splice(index, 1);
     }
     updateWaypointCounter();
+    // Update critical point dropdown
+    updateCriticalPointDropdown();
+    // Update route legs display
+    updateRouteLegsDisplay();
   });
   
   // Add click handler for waypoint name to zoom to location
@@ -491,15 +498,27 @@ function addToRoute(name, lat, lng) {
     zoomToWaypoint(name, lat, lng);
   });
   
-  // Insert before the "Continue with OFP" button
-  const continueButton = document.getElementById('continue-ofp-btn').parentElement;
-  continueButton.parentNode.insertBefore(waypointElement, continueButton);
+  // Insert into the waypoints container
+  const waypointsContainer = document.getElementById('waypoints-container');
+  if (waypointsContainer) {
+    waypointsContainer.appendChild(waypointElement);
+  } else {
+    // Fallback: Insert before the "Continue with OFP" button
+    const continueButton = document.getElementById('continue-ofp-btn').parentElement;
+    continueButton.parentNode.insertBefore(waypointElement, continueButton);
+  }
   
   // Update waypoint counter
   updateWaypointCounter();
   
   // Close the popup
   map.closePopup();
+  
+  // Update critical point dropdown
+  updateCriticalPointDropdown();
+  
+  // Update route legs display
+  updateRouteLegsDisplay();
 }
 
 // Function to zoom to waypoint location
@@ -520,12 +539,44 @@ function zoomToWaypoint(name, lat, lng) {
   }, 300);
 }
 
+// Default route configuration - users can modify this as needed
+const DEFAULT_ROUTE = [
+  { name: 'RCMQ', category: 'Flight Point' },
+  { name: 'Dadu', category: 'Flight Point' },
+  { name: 'CH1A07', category: 'Wind Turbines' },
+  { name: 'Dadu', category: 'Flight Point' },
+  { name: 'RCMQ', category: 'Flight Point' }
+];
+
+// Function to initialize default waypoints dynamically
+function initializeDefaultWaypoints() {
+  console.log('Initializing default waypoints...');
+  
+  DEFAULT_ROUTE.forEach(defaultWaypoint => {
+    // Find the waypoint in loaded data
+    const waypointData = waypointsData.find(wp => wp.name === defaultWaypoint.name);
+    
+    if (waypointData) {
+      console.log(`Adding default waypoint: ${waypointData.name}`);
+      
+      // Use the existing addToRoute function to add the waypoint
+      addToRoute(waypointData.name, waypointData.lat, waypointData.lng);
+    } else {
+      console.warn(`Default waypoint '${defaultWaypoint.name}' not found in waypoints data`);
+    }
+  });
+  
+  console.log('Default waypoints initialization complete');
+  updateCriticalPointDropdown();
+  updateRouteLegsDisplay();
+}
+
 // Function to initialize existing waypoint remove buttons
 function initializeExistingWaypoints() {
-  const leftSidebar = document.querySelector('.w-80.flex-shrink-0');
-  if (!leftSidebar) return;
+  const waypointsContainer = document.getElementById('waypoints-container');
+  if (!waypointsContainer) return;
   
-  const existingWaypoints = leftSidebar.querySelectorAll('.flex.items-center.gap-4');
+  const existingWaypoints = waypointsContainer.querySelectorAll('.waypoint-item');
   
   existingWaypoints.forEach(waypoint => {
     // Skip if this is the "Continue with OFP" button container
@@ -603,6 +654,8 @@ function initializeExistingWaypoints() {
         }
         
         waypoint.remove();
+        updateCriticalPointDropdown();
+        updateRouteLegsDisplay();
       });
     }
   });
@@ -610,12 +663,12 @@ function initializeExistingWaypoints() {
 
 // Function to initialize drag and drop functionality
 function initializeDragAndDrop() {
-  const routeContainer = document.querySelector('.w-80.flex-shrink-0');
-  if (!routeContainer) return;
+  const waypointsContainer = document.getElementById('waypoints-container');
+  if (!waypointsContainer) return;
   
   // Make waypoint items draggable
   const makeWaypointsDraggable = () => {
-    const waypoints = routeContainer.querySelectorAll('.flex.items-center.gap-4');
+    const waypoints = waypointsContainer.querySelectorAll('.waypoint-item');
     
     waypoints.forEach((waypoint, index) => {
       // Skip if this is the "Continue with OFP" button container
@@ -686,13 +739,15 @@ function initializeDragAndDrop() {
     this.style.cursor = 'grab';
     
     // Remove drag-over class from all waypoints
-    const allWaypoints = routeContainer.querySelectorAll('.waypoint-item');
+    const allWaypoints = waypointsContainer.querySelectorAll('.waypoint-item');
     allWaypoints.forEach(wp => wp.classList.remove('waypoint-drag-over'));
     
     // Re-initialize drag and drop after reordering
     setTimeout(() => {
       makeWaypointsDraggable();
       initializeExistingWaypoints();
+      updateCriticalPointDropdown();
+      updateRouteLegsDisplay();
     }, 100);
   }
   
@@ -704,8 +759,157 @@ function initializeDragAndDrop() {
     makeWaypointsDraggable();
   });
   
-  observer.observe(routeContainer, {
+  observer.observe(waypointsContainer, {
     childList: true,
     subtree: true
   });
+}
+
+// Function to update Critical Point dropdown with current planned route waypoints
+function updateCriticalPointDropdown() {
+  const criticalPointSelect = document.getElementById('critical-point');
+  if (!criticalPointSelect) return;
+  
+  // Clear existing options except the first one
+  criticalPointSelect.innerHTML = '<option value="">Select Critical Point</option>';
+  
+  // Get current waypoints from the planned route
+  const currentWaypoints = [];
+  const waypointItems = document.querySelectorAll('#waypoints-container .waypoint-item');
+  
+  waypointItems.forEach(item => {
+    const waypointName = item.dataset.waypointName;
+    if (waypointName && !currentWaypoints.find(wp => wp.name === waypointName)) {
+      currentWaypoints.push({
+        name: waypointName,
+        lat: item.dataset.lat,
+        lng: item.dataset.lng
+      });
+    }
+  });
+  
+  // Add waypoints to dropdown
+  currentWaypoints.forEach(waypoint => {
+    const option = document.createElement('option');
+    option.value = waypoint.name;
+    option.textContent = waypoint.name;
+    criticalPointSelect.appendChild(option);
+  });
+  
+  console.log(`Updated critical point dropdown with ${currentWaypoints.length} waypoints`);
+}
+
+// Function to display route legs in the OFP summary
+function displayRouteLegs() {
+  // Check if we have access to FlightCalculator (from the modules)
+  if (typeof FlightCalculator === 'undefined') {
+    console.warn('FlightCalculator not available, cannot display route legs');
+    return;
+  }
+  
+  try {
+    // Get current waypoints from the planned route
+    const currentWaypoints = [];
+    const waypointItems = document.querySelectorAll('#waypoints-container .waypoint-item');
+    
+    waypointItems.forEach(item => {
+      const waypointName = item.dataset.waypointName;
+      const lat = parseFloat(item.dataset.lat);
+      const lng = parseFloat(item.dataset.lng);
+      
+      if (waypointName && !isNaN(lat) && !isNaN(lng)) {
+        currentWaypoints.push({
+          name: waypointName,
+          lat: lat,
+          lng: lng
+        });
+      }
+    });
+    
+    if (currentWaypoints.length < 2) {
+      console.log('Need at least 2 waypoints to display route legs');
+      return;
+    }
+    
+    // Create a simple navigation calculator for basic route leg display
+    const DEG_TO_RAD = Math.PI / 180;
+    const RAD_TO_DEG = 180 / Math.PI;
+    const EARTH_RADIUS_NM = 3443.89849;
+    const MAGNETIC_VARIATION = -5.01; // Taiwan
+    
+    function calculateDistance(lat1, lon1, lat2, lon2) {
+      const φ1 = lat1 * DEG_TO_RAD;
+      const φ2 = lat2 * DEG_TO_RAD;
+      const Δφ = (lat2 - lat1) * DEG_TO_RAD;
+      const Δλ = (lon2 - lon1) * DEG_TO_RAD;
+      
+      const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
+                Math.cos(φ1) * Math.cos(φ2) *
+                Math.sin(Δλ/2) * Math.sin(Δλ/2);
+      
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+      const distance = EARTH_RADIUS_NM * c;
+      
+      return Math.round(distance * 10) / 10;
+    }
+    
+    function calculateTrueCourse(lat1, lon1, lat2, lon2) {
+      const φ1 = lat1 * DEG_TO_RAD;
+      const φ2 = lat2 * DEG_TO_RAD;
+      const Δλ = (lon2 - lon1) * DEG_TO_RAD;
+      
+      const y = Math.sin(Δλ) * Math.cos(φ2);
+      const x = Math.cos(φ1) * Math.sin(φ2) - 
+                Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ);
+      
+      let bearing = Math.atan2(y, x) * RAD_TO_DEG;
+      bearing = (bearing + 360) % 360;
+      
+      return Math.round(bearing * 10) / 10;
+    }
+    
+    function trueToMagnetic(trueCourse) {
+      let magneticCourse = trueCourse + MAGNETIC_VARIATION;
+      magneticCourse = (magneticCourse + 360) % 360;
+      return Math.round(magneticCourse * 10) / 10;
+    }
+    
+    // Calculate route legs
+    const routeLegs = [];
+    for (let i = 0; i < currentWaypoints.length - 1; i++) {
+      const from = currentWaypoints[i];
+      const to = currentWaypoints[i + 1];
+      
+      const distance = calculateDistance(from.lat, from.lng, to.lat, to.lng);
+      const trueCourse = calculateTrueCourse(from.lat, from.lng, to.lat, to.lng);
+      const magneticCourse = trueToMagnetic(trueCourse);
+      
+      routeLegs.push({
+        from: from.name,
+        to: to.name,
+        distance: distance,
+        magneticCourse: magneticCourse
+      });
+    }
+    
+    console.log('Route legs calculated:', routeLegs);
+    
+    // You can expand this to display the route legs in the UI
+    // For now, we'll just log them to verify the calculations are working
+    routeLegs.forEach((leg, index) => {
+      console.log(`Leg ${index + 1}: ${leg.from} → ${leg.to} | ${leg.distance} NM | ${leg.magneticCourse}° (no M suffix)`);
+    });
+    
+    return routeLegs;
+    
+  } catch (error) {
+    console.error('Error displaying route legs:', error);
+  }
+}
+
+// Function to update route leg display when waypoints change
+function updateRouteLegsDisplay() {
+  const routeLegs = displayRouteLegs();
+  // This function will be called whenever waypoints are added/removed/reordered
+  // The actual UI display would be implemented here when we know where to show the route legs
 }

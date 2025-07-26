@@ -10,7 +10,6 @@ const RUNTIME_CACHE = 'runtime-cache-v1';
 const STATIC_CACHE_URLS = [
   '/',
   '/index.html',
-  '/form.html',
   '/css/main.css',
   '/css/components.css',
   '/js/main.js',

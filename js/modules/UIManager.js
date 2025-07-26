@@ -465,7 +465,7 @@ export class UIManager {
   }
 
   /**
-   * Perform flight calculations
+   * Perform comprehensive flight calculations
    * @private
    */
   performCalculations() {
@@ -475,33 +475,42 @@ export class UIManager {
         return;
       }
       
-      // Calculate fuel
+      // Calculate fuel with waypoint-by-waypoint tracking
       const fuelResult = this.flightCalculator.calculateFuel();
       if (!fuelResult.success) {
         this.showError(fuelResult.error);
         return;
       }
       
-      // Calculate performance
+      // Calculate comprehensive performance (DOM, HOGE, Payload)
       const performanceResult = this.flightCalculator.calculatePerformance();
       if (!performanceResult.success) {
         this.showError(performanceResult.error);
         return;
       }
       
-      // Update UI with results
+      // Update UI with comprehensive results
       this.updateCalculationDisplay(fuelResult, performanceResult);
       
-      this.showMessage(CONFIG.SUCCESS.CALCULATION_COMPLETE, 'success');
+      // Generate detailed analysis for advanced users
+      const analysisResult = this.flightCalculator.generateComprehensiveAnalysis();
+      if (analysisResult.success) {
+        console.log('📊 Flight Analysis:', analysisResult.analysis);
+        
+        // Show any critical warnings or recommendations
+        this.displayAnalysisWarnings(analysisResult.analysis);
+      }
+      
+      this.showMessage('Flight calculations completed successfully', 'success');
       
     } catch (error) {
       console.error('Error performing calculations:', error);
-      this.showError(CONFIG.ERRORS.CALCULATION_ERROR);
+      this.showError('Calculation failed. Please check your route and inputs.');
     }
   }
 
   /**
-   * Update calculation display with results
+   * Update calculation display with comprehensive results
    * @private
    * @param {Object} fuelResult - Fuel calculation results
    * @param {Object} performanceResult - Performance calculation results
@@ -510,32 +519,44 @@ export class UIManager {
     try {
       const fuel = fuelResult.fuel;
       const performance = performanceResult.performance;
+      const calculations = performanceResult.calculations;
       
-      // Update fuel displays
+      // Update fuel displays with detailed breakdown
       const tripDuration = domCache.get('#trip-duration');
       const tripFuel = domCache.get('#trip-fuel');
       const contingencyDuration = domCache.get('#contingency-duration');
       const contingencyFuel = domCache.get('#contingency-fuel');
       const totalFuel = domCache.get('#total-fuel');
       
-      if (tripDuration) tripDuration.textContent = `${Math.round(fuelResult.tripTime)} min`;
+      if (tripDuration) tripDuration.textContent = `${fuelResult.tripTime} min`;
       if (tripFuel) tripFuel.textContent = `${fuel.trip} kg`;
       if (contingencyDuration) contingencyDuration.textContent = `${Math.round(fuelResult.tripTime * 0.1)} min`;
       if (contingencyFuel) contingencyFuel.textContent = `${fuel.contingency} kg`;
       if (totalFuel) totalFuel.textContent = `${fuel.total} kg`;
       
-      // Update performance displays
+      // Update performance displays with new comprehensive data
       const hogeValue = domCache.get('#hoge-value');
       const payloadValue = domCache.get('#payload-value');
       
-      if (hogeValue) hogeValue.textContent = `${performance.hoge} kg`;
-      if (payloadValue) payloadValue.textContent = `${performance.payload} kg`;
-      
-      // Update status indicator color based on performance
-      const statusIndicator = document.querySelector('.w-2.h-2.bg-\\[\\#16a34a\\]');
-      if (statusIndicator && (performance.hoge < 100 || performance.payload < 100)) {
-        statusIndicator.className = 'w-2 h-2 bg-[#f59e0b] rounded-full animate-pulse';
+      if (hogeValue) {
+        hogeValue.textContent = `${performance.hoge} kg`;
+        // Add hover tooltip with calculation details
+        hogeValue.title = `HOGE calculated with temperature ${calculations?.hoge?.conditions?.temperature || 25}°C, DOM ${performance.dom} kg`;
       }
+      
+      if (payloadValue) {
+        payloadValue.textContent = `${performance.payloadAvailable} kg`;
+        // Add hover tooltip with calculation breakdown
+        payloadValue.title = `Available Payload = HOGE (${performance.hoge}kg) - Fuel at Critical Point (${performance.fuelAtCriticalPoint}kg) - DOM (${performance.dom}kg)`;
+      }
+      
+      // Update status indicator and message based on comprehensive analysis
+      this.updateStatusIndicator(performance, fuel);
+      
+      // Display additional calculation details if elements exist
+      this.updateDetailedCalculationInfo(fuelResult, performanceResult);
+      
+      console.log('✅ Calculation display updated with comprehensive results');
       
     } catch (error) {
       console.error('Error updating calculation display:', error);
@@ -647,7 +668,106 @@ export class UIManager {
   }
 
   /**
-   * Generate OFP (Operational Flight Plan)
+   * Update status indicator based on performance analysis
+   * @private
+   * @param {Object} performance - Performance data
+   * @param {Object} fuel - Fuel data
+   */
+  updateStatusIndicator(performance, fuel) {
+    const statusDot = document.querySelector('.status-dot');
+    const statusText = document.querySelector('.status-text');
+    
+    if (!statusDot || !statusText) return;
+    
+    let status = 'success';
+    let message = 'Performance calculations ready';
+    let dotClass = 'w-2 h-2 bg-[#16a34a] rounded-full animate-pulse';
+    
+    // Check for critical conditions
+    if (performance.payloadAvailable < 100) {
+      status = 'critical';
+      message = 'Critical: Very low payload capacity';
+      dotClass = 'w-2 h-2 bg-[#ef4444] rounded-full animate-pulse';
+    } else if (performance.payloadAvailable < 300) {
+      status = 'warning';
+      message = 'Warning: Limited payload capacity';
+      dotClass = 'w-2 h-2 bg-[#f59e0b] rounded-full animate-pulse';
+    } else if (performance.fuelAtCriticalPoint < 100) {
+      status = 'warning';
+      message = 'Warning: Low fuel at critical point';
+      dotClass = 'w-2 h-2 bg-[#f59e0b] rounded-full animate-pulse';
+    }
+    
+    statusDot.className = dotClass;
+    statusText.textContent = message;
+  }
+  
+  /**
+   * Update detailed calculation information
+   * @private
+   * @param {Object} fuelResult - Fuel calculation results
+   * @param {Object} performanceResult - Performance calculation results
+   */
+  updateDetailedCalculationInfo(fuelResult, performanceResult) {
+    try {
+      // Add route analysis information if route data exists
+      if (fuelResult.waypointFuelData && fuelResult.waypointFuelData.length > 0) {
+        console.log('🗺️ Route Analysis:');
+        fuelResult.waypointFuelData.forEach(wp => {
+          console.log(`  ${wp.waypoint}: ${wp.fuelRemaining}kg fuel, ${wp.cumulativeTime}min`);
+        });
+      }
+      
+      // Add critical point analysis
+      if (fuelResult.criticalPointFuel) {
+        console.log(`🔴 Critical Point Fuel: ${fuelResult.criticalPointFuel}kg`);
+      }
+      
+      // Add DOM breakdown
+      const performance = performanceResult.performance;
+      console.log(`⚙️ Performance Summary:`);
+      console.log(`  DOM: ${performance.dom}kg (Empty: ${performance.aircraftEmptyWeight}kg + Crew: ${performance.totalCrewWeight}kg)`);
+      console.log(`  HOGE: ${performance.hoge}kg`);
+      console.log(`  Payload Available: ${performance.payloadAvailable}kg`);
+      
+    } catch (error) {
+      console.error('Error updating detailed calculation info:', error);
+    }
+  }
+  
+  /**
+   * Display analysis warnings and recommendations
+   * @private
+   * @param {Object} analysis - Comprehensive flight analysis
+   */
+  displayAnalysisWarnings(analysis) {
+    try {
+      // Display critical limitations
+      if (analysis.limitations && analysis.limitations.length > 0) {
+        analysis.limitations.forEach(limitation => {
+          if (limitation.severity === 'Critical') {
+            this.showError(`Critical: ${limitation.message}`);
+          } else if (limitation.severity === 'High') {
+            this.showMessage(`⚠️ ${limitation.message}`, 'warning');
+          }
+        });
+      }
+      
+      // Display key recommendations (limit to most important)
+      if (analysis.recommendations && analysis.recommendations.length > 0) {
+        const keyRecommendations = analysis.recommendations.slice(0, 2); // Show top 2
+        keyRecommendations.forEach(recommendation => {
+          console.log(`💡 Recommendation: ${recommendation}`);
+        });
+      }
+      
+    } catch (error) {
+      console.error('Error displaying analysis warnings:', error);
+    }
+  }
+  
+  /**
+   * Generate comprehensive OFP (Operational Flight Plan)
    * @private
    */
   generateOFP() {
@@ -664,12 +784,14 @@ export class UIManager {
         return;
       }
       
-      // Generate flight summary
+      // Generate comprehensive flight summary
       const summary = this.flightCalculator.generateFlightSummary();
       
-      // For now, show a detailed summary
-      // In a real implementation, this would generate a PDF or formatted document
-      this.showOFPSummary(summary);
+      // Generate route analysis
+      const routeAnalysis = this.flightCalculator.getRouteAnalysis();
+      
+      // Show comprehensive OFP summary
+      this.showOFPSummary(summary, routeAnalysis);
       
     } catch (error) {
       console.error('Error generating OFP:', error);
@@ -678,11 +800,12 @@ export class UIManager {
   }
 
   /**
-   * Show OFP summary modal/dialog
+   * Show comprehensive OFP summary modal/dialog
    * @private
    * @param {Object} summary - Flight summary data
+   * @param {Object} routeAnalysis - Route analysis data (optional)
    */
-  showOFPSummary(summary) {
+  showOFPSummary(summary, routeAnalysis = null) {
     // Create modal overlay
     const modal = createElement('div', {
       className: 'fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center',
@@ -722,47 +845,100 @@ export class UIManager {
       className: 'space-y-4 text-white'
     });
     
-    // Add summary sections
-    Object.entries(summary).forEach(([section, data]) => {
-      const sectionDiv = createElement('div', {
+    // Add comprehensive summary sections
+    this.addOFPSection(body, 'Flight Information', {
+      'Route': `${summary.route.waypointCount} waypoints, ${summary.route.totalDistance}, ${summary.route.totalFlightTime}`,
+      'Critical Point': summary.route.criticalPoint || 'Not identified'
+    });
+    
+    // Route Legs Section
+    if (summary.route.legs && summary.route.legs.length > 0) {
+      const routeSection = createElement('div', {
         className: 'bg-[#20242d] rounded-lg p-4'
       });
       
-      const sectionTitle = createElement('h3', {
-        className: 'text-[#2563eb] font-semibold mb-2 capitalize'
-      }, section.replace(/([A-Z])/g, ' $1'));
+      const routeTitle = createElement('h3', {
+        className: 'text-[#2563eb] font-semibold mb-2'
+      }, 'Route Legs');
+      routeSection.appendChild(routeTitle);
       
-      sectionDiv.appendChild(sectionTitle);
-      
-      if (typeof data === 'object' && !Array.isArray(data)) {
-        Object.entries(data).forEach(([key, value]) => {
-          const item = createElement('div', {
-            className: 'flex justify-between py-1'
-          });
-          
-          const label = createElement('span', {
-            className: 'text-[#a0a9bb]'
-          }, key.replace(/([A-Z])/g, ' $1'));
-          
-          const valueSpan = createElement('span', {}, 
-            Array.isArray(value) ? value.join(', ') : value.toString()
-          );
-          
-          item.appendChild(label);
-          item.appendChild(valueSpan);
-          sectionDiv.appendChild(item);
+      summary.route.legs.forEach((leg, index) => {
+        const legDiv = createElement('div', {
+          className: 'flex justify-between py-1 text-sm border-b border-[#2c333f] last:border-b-0'
         });
-      } else if (Array.isArray(data)) {
-        data.forEach(item => {
-          const itemDiv = createElement('div', {
-            className: 'py-1 text-[#a0a9bb]'
-          }, item);
-          sectionDiv.appendChild(itemDiv);
-        });
-      }
+        
+        const legInfo = createElement('span', {
+          className: 'text-[#a0a9bb]'
+        }, `${leg.from} → ${leg.to}`);
+        
+        const legDetails = createElement('span', {
+          className: 'text-white'
+        }, `${leg.distance}, ${leg.course}, ${leg.time}`);
+        
+        legDiv.appendChild(legInfo);
+        legDiv.appendChild(legDetails);
+        routeSection.appendChild(legDiv);
+      });
       
-      body.appendChild(sectionDiv);
+      body.appendChild(routeSection);
+    }
+    
+    // Fuel Analysis Section
+    this.addOFPSection(body, 'Fuel Analysis', {
+      'Total Required': summary.fuel.total,
+      'Minimum Required': summary.fuel.minimumRequired,
+      'At Critical Point': summary.fuel.atCriticalPoint,
+      'Breakdown': `Taxi: ${summary.fuel.breakdown.taxi}, Trip: ${summary.fuel.breakdown.trip}, Reserves: ${summary.fuel.breakdown.finalReserve} + ${summary.fuel.breakdown.contingency}`
     });
+    
+    // Performance Section
+    this.addOFPSection(body, 'Performance', {
+      'HOGE Capacity': summary.performance.hoge,
+      'Payload Available': summary.performance.payloadAvailable,
+      'DOM': `${summary.crew.dom} (${summary.performance.aircraftEmptyWeight} + ${summary.performance.totalWeight - summary.performance.aircraftEmptyWeight})`,
+      'Status': summary.performance.status?.message || 'Normal'
+    });
+    
+    // Weather & Navigation Section
+    this.addOFPSection(body, 'Weather & Navigation', {
+      'Temperature': summary.weather.temperature,
+      'Wind': summary.weather.wind,
+      'Magnetic Variation': summary.weather.magneticVariation,
+      'True Airspeed': summary.calculations.trueAirspeed,
+      'Fuel Consumption': summary.calculations.fuelConsumptionRate
+    });
+    
+    // Waypoint Fuel Analysis (if available)
+    if (summary.fuel.waypointFuel && summary.fuel.waypointFuel.length > 0) {
+      const fuelSection = createElement('div', {
+        className: 'bg-[#20242d] rounded-lg p-4'
+      });
+      
+      const fuelTitle = createElement('h3', {
+        className: 'text-[#2563eb] font-semibold mb-2'
+      }, 'Fuel Remaining at Waypoints');
+      fuelSection.appendChild(fuelTitle);
+      
+      summary.fuel.waypointFuel.forEach(wp => {
+        const wpDiv = createElement('div', {
+          className: 'flex justify-between py-1 text-sm'
+        });
+        
+        const wpName = createElement('span', {
+          className: 'text-[#a0a9bb]'
+        }, wp.waypoint);
+        
+        const wpFuel = createElement('span', {
+          className: 'text-white'
+        }, `${wp.fuelRemaining} @ ${wp.time}`);
+        
+        wpDiv.appendChild(wpName);
+        wpDiv.appendChild(wpFuel);
+        fuelSection.appendChild(wpDiv);
+      });
+      
+      body.appendChild(fuelSection);
+    }
     
     // Modal footer
     const footer = createElement('div', {
@@ -846,7 +1022,7 @@ export class UIManager {
         padding: 12px 20px;
         border-radius: 8px;
         box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-        z-index: 10002;
+        z-index: 10010;
         font-size: 14px;
         font-weight: 500;
         min-width: 200px;
@@ -870,6 +1046,45 @@ export class UIManager {
    */
   showError(message) {
     this.showMessage(message, 'error');
+  }
+
+  /**
+   * Helper method to create OFP sections
+   * @private
+   * @param {HTMLElement} container - Container element
+   * @param {string} title - Section title
+   * @param {Object} data - Section data
+   */
+  addOFPSection(container, title, data) {
+    const sectionDiv = createElement('div', {
+      className: 'bg-[#20242d] rounded-lg p-4'
+    });
+    
+    const sectionTitle = createElement('h3', {
+      className: 'text-[#2563eb] font-semibold mb-2'
+    }, title);
+    
+    sectionDiv.appendChild(sectionTitle);
+    
+    Object.entries(data).forEach(([key, value]) => {
+      const item = createElement('div', {
+        className: 'flex justify-between py-1'
+      });
+      
+      const label = createElement('span', {
+        className: 'text-[#a0a9bb] text-sm'
+      }, key);
+      
+      const valueSpan = createElement('span', {
+        className: 'text-white text-sm font-medium'
+      }, value.toString());
+      
+      item.appendChild(label);
+      item.appendChild(valueSpan);
+      sectionDiv.appendChild(item);
+    });
+    
+    container.appendChild(sectionDiv);
   }
 
   /**

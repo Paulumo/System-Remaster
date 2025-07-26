@@ -9,7 +9,7 @@ This is the **System Remaster of HST** - a helicopter flight planning and operat
 ## Architecture
 
 ### Frontend Structure
-- **`form.html`**: Main application interface with three key sections:
+- **`index.html`**: Main application interface with three key sections:
   - Left sidebar: Planned route management with waypoint list (RCMQ, DADU, CH1A07)
   - Center area: Interactive map using Leaflet.js for geographical navigation
   - Right sidebar: Flight information input form (initially hidden, shown after "Continue with OFP")
@@ -43,7 +43,7 @@ This is the **System Remaster of HST** - a helicopter flight planning and operat
 ## Development Commands
 
 This project uses static HTML/CSS/JavaScript without a build system. Development can be done by:
-- Opening `form.html` directly in a web browser
+- Opening `index.html` directly in a web browser
 - Using a local web server for development (e.g., `python -m http.server` or `npx serve`)
 
 ## Key Considerations
