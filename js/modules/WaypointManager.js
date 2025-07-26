@@ -28,11 +28,17 @@ export class WaypointManager {
     try {
       await this.loadWaypoints();
       this.displayWaypoints();
-      this.generateDefaultRoute();
+      // REMOVED: this.generateDefaultRoute(); - Start with 0 waypoints as requested
+      
+      // CRITICAL FIX: Clear any existing route state to prevent accumulation
+      console.log('🧹 Clearing route state to prevent waypoint accumulation');
+      stateManager.setState('flightPlan.route', []);
+      this.plannedRoute = [];
+      
       this.updateWaypointCounter();
       this.setupStateSubscriptions();
       
-      console.log('WaypointManager initialized successfully');
+      console.log('WaypointManager initialized successfully - starting with 0 waypoints');
     } catch (error) {
       console.error('Failed to initialize WaypointManager:', error);
       this.showError(CONFIG.ERRORS.KML_LOAD_FAILED);
@@ -60,21 +66,32 @@ export class WaypointManager {
     this.stateUnsubscribeFunctions.push(unsubscribeSelected);
   }
 
-  /**
-   * Sync local route with state management
-   * @private
-   * @param {Array} stateRoute - Route from state
-   */
-  syncRouteWithState(stateRoute) {
-    if (!Array.isArray(stateRoute)) return;
+  // /**
+  //  * Sync local route with state management
+  //  * @private
+  //  * @param {Array} stateRoute - Route from state
+  //  */
+  // syncRouteWithState(stateRoute) {
+  //   if (!Array.isArray(stateRoute)) return;
     
-    // Update local route
-    this.plannedRoute = [...stateRoute];
-    this.updateWaypointCounter();
+  //   console.log(`🔄 syncRouteWithState called with ${stateRoute.length} waypoints`);
+  //   console.log(`🔍 Current local route length: ${this.plannedRoute.length}`);
     
-    // Update UI elements if needed
-    this.syncRouteUI();
-  }
+  //   // Prevent infinite loops by checking if sync is actually needed
+  //   if (JSON.stringify(this.plannedRoute) === JSON.stringify(stateRoute)) {
+  //     console.log(`⚠️ Route already in sync, skipping update`);
+  //     return;
+  //   }
+    
+  //   // Update local route
+  //   this.plannedRoute = [...stateRoute];
+  //   console.log(`🔄 Local route updated to ${this.plannedRoute.length} waypoints`);
+    
+  //   this.updateWaypointCounter();
+    
+  //   // Update UI elements if needed
+  //   this.syncRouteUI();
+  // }
 
   /**
    * Sync route UI with current state
@@ -339,8 +356,17 @@ export class WaypointManager {
     
     const addButton = createElement('button', {
       className: 'add-to-route-btn',
-      onClick: () => this.addToRoute(waypoint)
+      'data-waypoint-id': waypoint.id,
+      'data-waypoint-name': waypoint.name
     }, 'Add to Route');
+    
+    // Add event listener manually to ensure proper isolation
+    addButton.addEventListener('click', (e) => {
+      e.stopPropagation(); // Prevent event bubbling
+      e.preventDefault(); // Prevent default behavior
+      console.log(`🎯 Button clicked for waypoint: ${waypoint.name} (ID: ${waypoint.id})`);
+      this.addToRoute(waypoint);
+    });
     
     container.appendChild(addButton);
     
@@ -355,11 +381,23 @@ export class WaypointManager {
    */
   addToRouteInternal(waypoint) {
     try {
-      // Dispatch state update
-      stateManager.dispatch('ADD_WAYPOINT_TO_ROUTE', waypoint);
+      console.log(`🔍 addToRouteInternal called for: ${waypoint.name}`);
+      console.log(`🔍 Current plannedRoute length: ${this.plannedRoute.length}`);
+      
+      // Update local route array immediately
+      this.plannedRoute.push(waypoint);
+      
+      console.log(`🔍 After push, plannedRoute length: ${this.plannedRoute.length}`);
+      
+      // FIXED: Update state with complete route instead of dispatching ADD action
+      // This prevents accumulation issues in StateManager
+      stateManager.setState('flightPlan.route', [...this.plannedRoute]);
       
       // Create waypoint element in sidebar
       this.createRouteWaypointElement(waypoint);
+      
+      // Update waypoint counter after adding (now uses DOM-based counting)
+      this.updateWaypointCounter();
       
       return true;
     } catch (error) {
@@ -374,7 +412,16 @@ export class WaypointManager {
    */
   addToRoute(waypoint) {
     try {
-      console.log(`Adding ${waypoint.name} to route`);
+      console.log(`📍 addToRoute called for: ${waypoint.name} (ID: ${waypoint.id})`);
+      console.log(`🔍 Current route length before add: ${this.plannedRoute.length}`);
+      console.log('🔍 Call stack:', new Error().stack);
+      
+      // Validate waypoint object
+      if (!waypoint || !waypoint.name || !waypoint.id) {
+        console.error('❌ Invalid waypoint object:', waypoint);
+        this.showError('Invalid waypoint data');
+        return;
+      }
       
       // DEVELOPMENT: Allow duplicate waypoints for helicopter operations
       // (helicopters often depart/arrive at same location or use same flight points)
@@ -384,6 +431,12 @@ export class WaypointManager {
       if (success) {
         // Close popup
         this.mapManager.closePopups();
+        
+        // Log the updated route with order, name, and coordinates
+        console.log(`📊 Route Waypoints (${this.plannedRoute.length} total):`);
+        this.plannedRoute.forEach((wp, index) => {
+          console.log(`  ${index + 1}. ${wp.name} (${wp.lat}, ${wp.lng})`);
+        });
         
         this.showMessage(CONFIG.SUCCESS.WAYPOINT_ADDED, 'success');
         
@@ -395,6 +448,7 @@ export class WaypointManager {
       
     } catch (error) {
       console.error('Error adding waypoint to route:', error);
+      console.error('Waypoint data:', waypoint);
       this.showError('Failed to add waypoint to route');
     }
   }
@@ -405,16 +459,35 @@ export class WaypointManager {
    */
   removeFromRoute(waypointId) {
     try {
+      console.log(`🗑️ removeFromRoute called for ID: ${waypointId}`);
+      console.log(`🔍 Current route length before remove: ${this.plannedRoute.length}`);
+      
       const waypoint = this.plannedRoute.find(wp => wp.id === waypointId);
       if (waypoint) {
-        // Dispatch state update
-        stateManager.dispatch('REMOVE_WAYPOINT_FROM_ROUTE', waypointId);
+        // Remove from local route array immediately
+        const originalLength = this.plannedRoute.length;
+        this.plannedRoute = this.plannedRoute.filter(wp => wp.id !== waypointId);
+        
+        console.log(`🔍 After filter, route length: ${this.plannedRoute.length} (removed ${originalLength - this.plannedRoute.length} waypoints)`);
+        
+        // FIXED: Update state with complete route instead of dispatching REMOVE action
+        // This prevents accumulation issues in StateManager
+        stateManager.setState('flightPlan.route', [...this.plannedRoute]);
         
         this.showMessage(CONFIG.SUCCESS.WAYPOINT_REMOVED, 'success');
         console.log(`Removed ${waypoint.name} from route`);
         
-        // Update critical point dropdown
+        // Update waypoint counter and critical point dropdown
+        this.updateWaypointCounter();
         this.updateCriticalPointDropdown();
+        
+        // Log updated route
+        console.log(`📊 Route after removal (${this.plannedRoute.length} total):`);
+        this.plannedRoute.forEach((wp, index) => {
+          console.log(`  ${index + 1}. ${wp.name} (${wp.lat}, ${wp.lng})`);
+        });
+      } else {
+        console.warn(`⚠️ Waypoint with ID ${waypointId} not found in planned route`);
       }
     } catch (error) {
       console.error('Error removing waypoint from route:', error);
@@ -543,47 +616,9 @@ export class WaypointManager {
   }
 
   /**
-   * Generate default route with predefined waypoints
-   * Route: RCMQ → Dadu → CH1A07 → Dadu → RCMQ
-   * @private
+   * REMOVED: generateDefaultRoute - Now starting with 0 waypoints as requested
+   * Users will add waypoints manually to the planned route
    */
-  generateDefaultRoute() {
-    try {
-      console.log('Generating default route...');
-      
-      // Default route waypoint names in order
-      const defaultWaypoints = ['RCMQ', 'Dadu', 'CH1A07', 'Dadu', 'RCMQ'];
-      
-      // Add each waypoint to route
-      defaultWaypoints.forEach((waypointName, index) => {
-        const waypointData = this.waypointsData.find(wp => wp.name === waypointName);
-        if (waypointData) {
-          // Create a unique waypoint instance with sequence number for duplicates
-          const routeWaypoint = {
-            ...waypointData,
-            id: `${waypointData.id}_${index}`, // Make unique ID for duplicates
-            sequenceNumber: index + 1,
-            originalId: waypointData.id
-          };
-          
-          // Add to route without triggering critical point update for each waypoint
-          const waypointAddedWithoutUpdate = this.addToRouteInternal(routeWaypoint);
-          if (waypointAddedWithoutUpdate) {
-            console.log(`✅ Added ${waypointName} to default route (${index + 1}/${defaultWaypoints.length})`);
-          }
-        } else {
-          console.warn(`⚠️ Waypoint data not found for: ${waypointName}`);
-        }
-      });
-      
-      // Update critical point dropdown once after all waypoints are added
-      this.updateCriticalPointDropdown();
-      
-      console.log(`✅ Default route generated with ${defaultWaypoints.length} waypoints`);
-    } catch (error) {
-      console.error('❌ Error generating default route:', error);
-    }
-  }
 
   /**
    * Enhance existing waypoint elements with proper functionality
@@ -606,10 +641,8 @@ export class WaypointManager {
       return;
     }
     
-    // Add to planned route if not already there
-    if (!this.plannedRoute.find(wp => wp.id === waypointData.id)) {
-      this.plannedRoute.push(waypointData);
-    }
+    // REMOVED: Auto-adding to planned route - waypoints should only be added via explicit user interaction
+    // This was causing mass waypoint additions when enhancing existing sidebar elements
     
     // Set data attributes
     waypointElement.dataset.waypointId = waypointData.id;
@@ -640,6 +673,7 @@ export class WaypointManager {
 
   /**
    * Update waypoint counter display
+   * Uses DOM-based counting like DragDropManager for accuracy
    */
   updateWaypointCounter() {
     const counter = domCache.get('#waypoint-counter');
@@ -651,10 +685,18 @@ export class WaypointManager {
         return;
       }
       
-      const routeCount = this.plannedRoute.length;
+      // Count actual waypoint elements in DOM (same approach as DragDropManager.js:600)
+      const waypointContainer = document.querySelector('.w-80.flex-shrink-0') || document.getElementById('waypoints-container');
+      const waypointElements = waypointContainer ? waypointContainer.querySelectorAll('.waypoint-item') : [];
+      
+      // FIXED: Use DragDropManager approach - filter out continue-ofp-btn
+      const routeCount = Array.from(waypointElements).filter(wp => !wp.querySelector('#continue-ofp-btn')).length;
+      
+      console.log(`🔍 Counter update: Found ${waypointElements.length} total elements, ${routeCount} actual waypoints`);
+      
       const totalCount = this.waypointsData.length;
       
-      // Category counts for all waypoints
+      // Category counts for all loaded waypoints
       const categoryCounts = {};
       this.waypointsData.forEach(waypoint => {
         categoryCounts[waypoint.category] = (categoryCounts[waypoint.category] || 0) + 1;
@@ -670,6 +712,8 @@ export class WaypointManager {
           ${totalCount} total (${categoryText})
         </span>
       `;
+      
+      console.log(`📊 Route counter updated: ${routeCount} waypoints in planned route (DOM-based count)`);
       
     } catch (error) {
       console.error('Error updating waypoint counter:', error);
@@ -792,7 +836,11 @@ export class WaypointManager {
    * Clear all waypoints from route
    */
   clearRoute() {
+    // Clear local route array
     this.plannedRoute = [];
+    
+    // Dispatch state update
+    stateManager.dispatch('CLEAR_ROUTE');
     
     // Remove all waypoint elements from sidebar
     const waypointElements = document.querySelectorAll('.waypoint-item');

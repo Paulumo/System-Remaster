@@ -363,10 +363,10 @@
 
       <!-- Panel Content -->
       <div class="calculation-content p-6">
-        <div class="calculation-grid grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div class="calculation-grid grid grid-cols-1 lg:grid-cols-3 lg:grid-rows-3 gap-6">
           
           <!-- Section 1: Flight Crew Weight Confirmation -->
-          <div class="calculation-section space-y-6">
+          <div class="calculation-section space-y-6 lg:col-start-1 lg:row-start-1">
             <div class="section-header flex items-center gap-3 mb-4">
               <div class="step-number w-8 h-8 bg-[#2563eb] rounded-full flex items-center justify-center text-white font-bold text-sm">1</div>
               <h3 class="section-subtitle text-white text-lg font-semibold tracking-wide">Flight Crew Weight</h3>
@@ -412,7 +412,7 @@
           </div>
 
           <!-- Section 2: Weather Data -->
-          <div class="calculation-section space-y-6">
+          <div class="calculation-section space-y-6 lg:col-start-2 lg:row-start-1">
             <div class="section-header flex items-center gap-3 mb-4">
               <div class="step-number w-8 h-8 bg-[#2563eb] rounded-full flex items-center justify-center text-white font-bold text-sm">2</div>
               <h3 class="section-subtitle text-white text-lg font-semibold tracking-wide">Weather Data</h3>
@@ -458,7 +458,7 @@
           </div>
 
           <!-- Section 3: Fuel Calculation -->
-          <div class="calculation-section space-y-6">
+          <div class="calculation-section space-y-6 lg:col-start-3 lg:row-start-1 lg:row-span-2">
             <div class="section-header flex items-center gap-3 mb-4">
               <div class="step-number w-8 h-8 bg-[#2563eb] rounded-full flex items-center justify-center text-white font-bold text-sm">3</div>
               <h3 class="section-subtitle text-white text-lg font-semibold tracking-wide">Fuel Calculation</h3>
@@ -530,10 +530,33 @@
           </div>
         </div>
 
+        <!-- Section 4: Critical Point Selection -->
+        <div class="calculation-section space-y-6 lg:col-span-2 lg:col-start-1 lg:row-start-2">
+          <div class="section-header flex items-center gap-3 mb-4">
+            <div class="step-number w-8 h-8 bg-[#f59e0b] rounded-full flex items-center justify-center text-white font-bold text-sm">4</div>
+            <h3 class="section-subtitle text-white text-lg font-semibold tracking-wide">Critical Point</h3>
+          </div>
+          
+          <div class="space-y-4 bg-[#20242d] rounded-lg p-4 border border-[#2c333f]">
+            <!-- Critical Point Selection -->
+            <div class="input-group flex items-center justify-between">
+              <label for="critical-point" class="input-label-text text-white text-base font-medium mb-1">Critical Point</label>
+              <div class="input-controls flex items-center gap-2">
+                <select id="critical-point" name="critical-point" class="input-field w-32 h-10 bg-[#15181e] border border-[#2c333f] rounded-lg text-white text-center focus:outline-none focus:border-[#2563eb] transition-colors">
+                  <option value="">Select...</option>
+                  <!-- Options will be populated by JavaScript -->
+                </select>
+              </div>
+            </div>
+            <div class="critical-point-info text-[#a0a9bb] text-sm" id="crit-point-display">Wind Turbine or Hoisting Site</div>
+          </div>
         </div>
 
-        <!-- Section 4: Performance Results (Full Width) -->
-        <div class="performance-results mt-8 border-t border-[#2c333f] pt-6">
+
+        </div>
+
+        <!-- Section 5: Performance Results (Full Width) -->
+        <div class="performance-results mt-8 border-t border-[#2c333f] pt-6 lg:col-span-3 lg:row-start-3">
           <div class="results-header flex items-center gap-3 mb-6">
             <div class="results-step-number w-8 h-8 bg-[#16a34a] rounded-full flex items-center justify-center text-white font-bold text-sm">4</div>
             <h3 class="results-title text-white text-xl font-bold tracking-wide">Performance Results</h3>

@@ -3,10 +3,33 @@ let waypointsData = [];
 let waypointMarkers = [];
 let searchResults = [];
 let waypointCategories = new Set();
-let plannedRoute = [];
+let routeWaypoints = []; // Clean route waypoint list
 let map;
 
+// Function to clear stale data and prevent corruption
+function clearStaleData() {
+  console.log('🧹 Clearing stale data...');
+  
+  // Clear global arrays
+  waypointsData.length = 0;
+  waypointMarkers.length = 0;
+  searchResults.length = 0;
+  routeWaypoints.length = 0;
+  waypointCategories.clear();
+  
+  // Clear all waypoint items from DOM (start fresh)
+  const waypointContainer = document.getElementById('waypoints-container');
+  if (waypointContainer) {
+    waypointContainer.innerHTML = '';
+  }
+  
+  console.log('✅ Stale data cleared');
+}
+
 document.addEventListener('DOMContentLoaded', function() {
+  // Clear any stale data on page load
+  clearStaleData();
+  
   // Initialize the map
   // map = L.map('map').setView([24.262119465616294, 120.62441809570404], 7.6);
   map = L.map('map').setView([23.973861, 120.982000], 7.6);
@@ -56,13 +79,14 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   }
 
-  // Update waypoint counter
+  // Update waypoint counter for route
   function updateWaypointCounter() {
-    const waypointItems = document.querySelectorAll('.waypoint-item');
     const counter = document.getElementById('waypoint-counter');
-    const count = waypointItems.length;
+    const count = routeWaypoints.length;
     
-    counter.innerHTML = `<span class="text-[#a0a9bb] text-sm">${count} waypoint${count !== 1 ? 's' : ''} have been loaded</span>`;
+    counter.innerHTML = `<span class="text-[#a0a9bb] text-sm">${count} waypoint${count !== 1 ? 's' : ''} in route</span>`;
+    
+    console.log(`✅ Route updated: ${count} waypoints`);
   }
 
   // Initialize cancel buttons and waypoint counter
@@ -180,9 +204,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
   // Initialize search functionality
   initializeSearch();
-  
-  // Initialize drag and drop for planned route
-  initializeDragAndDrop();
 });
 
 // Function to load waypoints from KML file
@@ -238,22 +259,16 @@ async function loadWaypoints() {
     
     console.log(`Loaded ${waypointsData.length} waypoints`);
     console.log('Sample waypoint:', waypointsData[0]);
-    updateWaypointCounter();
+    updateLoadedWaypointsCounter();
     displayWaypoints();
-    
-    // Initialize default waypoints first
-    initializeDefaultWaypoints();
-    
-    // Initialize existing waypoints after data is loaded
-    initializeExistingWaypoints();
     
   } catch (error) {
     console.error('Error loading waypoints:', error);
   }
 }
 
-// Function to update waypoint counter display
-function updateWaypointCounter() {
+// Function to update waypoint counter display for loaded waypoints
+function updateLoadedWaypointsCounter() {
   const counter = document.getElementById('waypoint-counter');
   const categoryCounts = {};
   
@@ -265,11 +280,14 @@ function updateWaypointCounter() {
     .map(([category, count]) => `${count} ${category}`)
     .join(', ');
   
+  // Show this message only temporarily, will be replaced by planned route counter
   counter.innerHTML = `
     <span class="text-[#a0a9bb] text-sm">
       ${waypointsData.length} waypoints loaded (${categoryText})
     </span>
   `;
+  
+  console.log(`📊 Loaded waypoints counter: ${waypointsData.length} total waypoints available`);
 }
 
 // Function to display waypoints on map
@@ -441,23 +459,32 @@ function selectWaypoint(name, lat, lng) {
 
 // Function to add waypoint to route
 function addToRoute(name, lat, lng) {
-  console.log(`Adding ${name} to route`);
+  console.log(`📍 Adding waypoint to route: ${name}`);
   
-  // Find the waypoint in waypointsData to get its category
+  // Add to route waypoints array
+  const waypointEntry = {
+    name: name,
+    lat: parseFloat(lat),
+    lng: parseFloat(lng)
+  };
+  
+  routeWaypoints.push(waypointEntry);
+  
+  // Log the updated route
+  console.log(`📊 Route Waypoints (${routeWaypoints.length} total):`);
+  routeWaypoints.forEach((wp, index) => {
+    console.log(`  ${index + 1}. ${wp.name} (${wp.lat}, ${wp.lng})`);
+  });
+  
+  // Find the waypoint data for UI display
   const waypointData = waypointsData.find(wp => wp.name === name);
   const category = waypointData ? waypointData.category : 'Flight Point';
   const iconPath = category === 'Wind Turbines' ? './icon/blue-tag.png' : './icon/black-tag.png';
   
-  // Add to planned route array
-  const routeWaypoint = { name, lat, lng, category };
-  plannedRoute.push(routeWaypoint);
-  
-  // Create new waypoint element
+  // Create new waypoint element for UI
   const waypointElement = document.createElement('div');
   waypointElement.className = 'waypoint-item flex items-center gap-4 bg-[#2a2f3a] mx-4 mb-2 rounded-lg px-4 min-h-14 justify-between';
-  waypointElement.dataset.waypointName = name;
-  waypointElement.dataset.lat = lat;
-  waypointElement.dataset.lng = lng;
+  waypointElement.dataset.routeIndex = routeWaypoints.length - 1; // Store array index
   waypointElement.innerHTML = `
     <div class="drag-handle text-[#a0a9bb] mr-2 cursor-grab">
       <svg xmlns="http://www.w3.org/2000/svg" width="16px" height="16px" fill="currentColor" viewBox="0 0 256 256">
@@ -467,7 +494,7 @@ function addToRoute(name, lat, lng) {
     <img src="${iconPath}" alt="Tag" class="w-4 h-4 flex-shrink-0" />
     <p class="text-white text-base font-bold leading-normal flex-1 truncate cursor-pointer waypoint-name">${name}</p>
     <div class="shrink-0">
-      <div class="text-white flex size-7 items-center justify-center hover:bg-[#3a3f4a] rounded cursor-pointer remove-waypoint" data-waypoint="${name}" data-icon="X" data-size="20px" data-weight="regular">
+      <div class="text-white flex size-7 items-center justify-center hover:bg-[#3a3f4a] rounded cursor-pointer remove-waypoint" data-icon="X" data-size="20px" data-weight="regular">
         <svg xmlns="http://www.w3.org/2000/svg" width="20px" height="20px" fill="currentColor" viewBox="0 0 256 256">
           <path d="M205.66,194.34a8,8,0,0,1-11.32,11.32L128,139.31,61.66,205.66a8,8,0,0,1-11.32-11.32L116.69,128,50.34,61.66A8,8,0,0,1,61.66,50.34L128,116.69l66.34-66.35a8,8,0,0,1,11.32,11.32L139.31,128Z"></path>
         </svg>
@@ -478,18 +505,28 @@ function addToRoute(name, lat, lng) {
   // Add click handler for remove button
   waypointElement.querySelector('.remove-waypoint').addEventListener('click', function(e) {
     e.stopPropagation();
-    // Remove the waypoint item
-    waypointElement.remove();
-    // Remove from planned route array
-    const index = plannedRoute.findIndex(wp => wp.name === name);
-    if (index > -1) {
-      plannedRoute.splice(index, 1);
+    
+    // Remove from route array using stored index
+    const routeIndex = parseInt(waypointElement.dataset.routeIndex);
+    if (routeIndex >= 0 && routeIndex < routeWaypoints.length) {
+      routeWaypoints.splice(routeIndex, 1);
+      console.log(`🗑️ Removed waypoint at index ${routeIndex}`);
+      
+      // Log updated route
+      console.log(`📊 Route Waypoints (${routeWaypoints.length} total):`);
+      routeWaypoints.forEach((wp, index) => {
+        console.log(`  ${index + 1}. ${wp.name} (${wp.lat}, ${wp.lng})`);
+      });
     }
+    
+    // Remove DOM element
+    waypointElement.remove();
+    
+    // Update everything
     updateWaypointCounter();
-    // Update critical point dropdown
     updateCriticalPointDropdown();
-    // Update route legs display
     updateRouteLegsDisplay();
+    rebuildWaypointDOM(); // Rebuild DOM to fix indices
   });
   
   // Add click handler for waypoint name to zoom to location
@@ -502,23 +539,15 @@ function addToRoute(name, lat, lng) {
   const waypointsContainer = document.getElementById('waypoints-container');
   if (waypointsContainer) {
     waypointsContainer.appendChild(waypointElement);
-  } else {
-    // Fallback: Insert before the "Continue with OFP" button
-    const continueButton = document.getElementById('continue-ofp-btn').parentElement;
-    continueButton.parentNode.insertBefore(waypointElement, continueButton);
   }
   
-  // Update waypoint counter
+  // Update everything
   updateWaypointCounter();
+  updateCriticalPointDropdown();
+  updateRouteLegsDisplay();
   
   // Close the popup
   map.closePopup();
-  
-  // Update critical point dropdown
-  updateCriticalPointDropdown();
-  
-  // Update route legs display
-  updateRouteLegsDisplay();
 }
 
 // Function to zoom to waypoint location
@@ -539,233 +568,148 @@ function zoomToWaypoint(name, lat, lng) {
   }, 300);
 }
 
-// Default route configuration - users can modify this as needed
-const DEFAULT_ROUTE = [
-  { name: 'RCMQ', category: 'Flight Point' },
-  { name: 'Dadu', category: 'Flight Point' },
-  { name: 'CH1A07', category: 'Wind Turbines' },
-  { name: 'Dadu', category: 'Flight Point' },
-  { name: 'RCMQ', category: 'Flight Point' }
-];
-
-// Function to initialize default waypoints dynamically
-function initializeDefaultWaypoints() {
-  console.log('Initializing default waypoints...');
-  
-  DEFAULT_ROUTE.forEach(defaultWaypoint => {
-    // Find the waypoint in loaded data
-    const waypointData = waypointsData.find(wp => wp.name === defaultWaypoint.name);
-    
-    if (waypointData) {
-      console.log(`Adding default waypoint: ${waypointData.name}`);
-      
-      // Use the existing addToRoute function to add the waypoint
-      addToRoute(waypointData.name, waypointData.lat, waypointData.lng);
-    } else {
-      console.warn(`Default waypoint '${defaultWaypoint.name}' not found in waypoints data`);
-    }
-  });
-  
-  console.log('Default waypoints initialization complete');
-  updateCriticalPointDropdown();
-  updateRouteLegsDisplay();
-}
-
-// Function to initialize existing waypoint remove buttons
-function initializeExistingWaypoints() {
+// Function to rebuild DOM elements to match routeWaypoints array
+function rebuildWaypointDOM() {
   const waypointsContainer = document.getElementById('waypoints-container');
   if (!waypointsContainer) return;
   
-  const existingWaypoints = waypointsContainer.querySelectorAll('.waypoint-item');
+  // Clear existing DOM elements
+  waypointsContainer.innerHTML = '';
   
-  existingWaypoints.forEach(waypoint => {
-    // Skip if this is the "Continue with OFP" button container
-    if (waypoint.querySelector('#continue-ofp-btn')) return;
+  // Rebuild from routeWaypoints array
+  routeWaypoints.forEach((wp, index) => {
+    const waypointData = waypointsData.find(data => data.name === wp.name);
+    const category = waypointData ? waypointData.category : 'Flight Point';
+    const iconPath = category === 'Wind Turbines' ? './icon/blue-tag.png' : './icon/black-tag.png';
     
-    // Add drag handle if it doesn't exist
-    if (!waypoint.querySelector('.drag-handle')) {
-      const dragHandle = document.createElement('div');
-      dragHandle.className = 'drag-handle text-[#a0a9bb] mr-2 cursor-grab';
-      dragHandle.innerHTML = `
+    const waypointElement = document.createElement('div');
+    waypointElement.className = 'waypoint-item flex items-center gap-4 bg-[#2a2f3a] mx-4 mb-2 rounded-lg px-4 min-h-14 justify-between';
+    waypointElement.dataset.routeIndex = index;
+    waypointElement.innerHTML = `
+      <div class="drag-handle text-[#a0a9bb] mr-2 cursor-grab">
         <svg xmlns="http://www.w3.org/2000/svg" width="16px" height="16px" fill="currentColor" viewBox="0 0 256 256">
           <path d="M104,64a8,8,0,0,1,8-8h32a8,8,0,0,1,0,16H112A8,8,0,0,1,104,64Zm8,56h32a8,8,0,0,0,0-16H112a8,8,0,0,0,0,16Zm32,32H112a8,8,0,0,0,0,16h32a8,8,0,0,0,0-16Zm0,40H112a8,8,0,0,0,0,16h32a8,8,0,0,0,0-16Z"></path>
         </svg>
-      `;
-      waypoint.insertBefore(dragHandle, waypoint.firstChild);
-    }
+      </div>
+      <img src="${iconPath}" alt="Tag" class="w-4 h-4 flex-shrink-0" />
+      <p class="text-white text-base font-bold leading-normal flex-1 truncate cursor-pointer waypoint-name">${wp.name}</p>
+      <div class="shrink-0">
+        <div class="text-white flex size-7 items-center justify-center hover:bg-[#3a3f4a] rounded cursor-pointer remove-waypoint" data-icon="X" data-size="20px" data-weight="regular">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20px" height="20px" fill="currentColor" viewBox="0 0 256 256">
+            <path d="M205.66,194.34a8,8,0,0,1-11.32,11.32L128,139.31,61.66,205.66a8,8,0,0,1-11.32-11.32L116.69,128,50.34,61.66A8,8,0,0,1,61.66,50.34L128,116.69l66.34-66.35a8,8,0,0,1,11.32,11.32L139.31,128Z"></path>
+          </svg>
+        </div>
+      </div>
+    `;
     
-    // Add waypoint icon if it doesn't exist
-    const waypointParagraph = waypoint.querySelector('p.text-white');
-    if (waypointParagraph && !waypoint.querySelector('img')) {
-      const waypointName = waypointParagraph.textContent.trim();
-      
-      // Find waypoint data to determine category
-      const waypointData = waypointsData.find(wp => wp.name === waypointName);
-      const category = waypointData ? waypointData.category : 'Flight Point';
-      const iconPath = category === 'Wind Turbines' ? './icon/blue-tag.png' : './icon/black-tag.png';
-      
-      // Create and insert icon
-      const icon = document.createElement('img');
-      icon.src = iconPath;
-      icon.alt = category;
-      icon.className = 'w-5 h-5 mr-2';
-      waypoint.insertBefore(icon, waypointParagraph);
-      
-      // Make waypoint name clickable and add cursor pointer
-      waypointParagraph.classList.add('cursor-pointer', 'waypoint-name');
-      
-      // Add click functionality if waypoint data exists
-      if (waypointData) {
-        waypointParagraph.addEventListener('click', function(e) {
-          e.stopPropagation();
-          zoomToWaypoint(waypointData.name, waypointData.lat, waypointData.lng);
-        });
-        
-        // Store data attributes
-        waypoint.dataset.waypointName = waypointData.name;
-        waypoint.dataset.lat = waypointData.lat;
-        waypoint.dataset.lng = waypointData.lng;
-        
-        // Add to planned route if not already there
-        if (!plannedRoute.find(wp => wp.name === waypointData.name)) {
-          plannedRoute.push({
-            name: waypointData.name,
-            lat: waypointData.lat,
-            lng: waypointData.lng,
-            category: waypointData.category
-          });
-        }
-      }
-    }
-    
-    const removeButton = waypoint.querySelector('[data-icon="X"]');
-    if (removeButton && !removeButton.hasAttribute('data-initialized')) {
-      removeButton.setAttribute('data-initialized', 'true');
-      removeButton.parentElement.addEventListener('click', function(e) {
-        e.stopPropagation();
-        
-        // Remove from planned route array
-        const waypointName = waypoint.dataset.waypointName;
-        if (waypointName) {
-          const index = plannedRoute.findIndex(wp => wp.name === waypointName);
-          if (index > -1) {
-            plannedRoute.splice(index, 1);
-          }
-        }
-        
-        waypoint.remove();
-        updateCriticalPointDropdown();
-        updateRouteLegsDisplay();
+    // Add event handlers
+    waypointElement.querySelector('.remove-waypoint').addEventListener('click', function(e) {
+      e.stopPropagation();
+      const routeIndex = parseInt(waypointElement.dataset.routeIndex);
+      routeWaypoints.splice(routeIndex, 1);
+      console.log(`🗑️ Removed waypoint at index ${routeIndex}`);
+      console.log(`📊 Route Waypoints (${routeWaypoints.length} total):`);
+      routeWaypoints.forEach((waypoint, idx) => {
+        console.log(`  ${idx + 1}. ${waypoint.name} (${waypoint.lat}, ${waypoint.lng})`);
       });
-    }
-  });
-}
-
-// Function to initialize drag and drop functionality
-function initializeDragAndDrop() {
-  const waypointsContainer = document.getElementById('waypoints-container');
-  if (!waypointsContainer) return;
-  
-  // Make waypoint items draggable
-  const makeWaypointsDraggable = () => {
-    const waypoints = waypointsContainer.querySelectorAll('.waypoint-item');
-    
-    waypoints.forEach((waypoint, index) => {
-      // Skip if this is the "Continue with OFP" button container
-      if (waypoint.querySelector('#continue-ofp-btn')) return;
-      
-      waypoint.draggable = true;
-      waypoint.style.cursor = 'grab';
-      
-      // Remove existing event listeners to prevent duplicates
-      waypoint.removeEventListener('dragstart', handleDragStart);
-      waypoint.removeEventListener('dragover', handleDragOver);
-      waypoint.removeEventListener('dragleave', handleDragLeave);
-      waypoint.removeEventListener('drop', handleDrop);
-      waypoint.removeEventListener('dragend', handleDragEnd);
-      
-      // Add drag event listeners
-      waypoint.addEventListener('dragstart', handleDragStart);
-      waypoint.addEventListener('dragover', handleDragOver);
-      waypoint.addEventListener('dragleave', handleDragLeave);
-      waypoint.addEventListener('drop', handleDrop);
-      waypoint.addEventListener('dragend', handleDragEnd);
-    });
-  };
-  
-  let draggedElement = null;
-  
-  function handleDragStart(e) {
-    draggedElement = this;
-    this.classList.add('waypoint-dragging');
-    this.style.cursor = 'grabbing';
-    e.dataTransfer.effectAllowed = 'move';
-  }
-  
-  function handleDragOver(e) {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-    
-    // Add visual feedback for drop target
-    if (this !== draggedElement) {
-      this.classList.add('waypoint-drag-over');
-    }
-  }
-  
-  function handleDragLeave(e) {
-    this.classList.remove('waypoint-drag-over');
-  }
-  
-  function handleDrop(e) {
-    e.preventDefault();
-    
-    if (this !== draggedElement) {
-      const allWaypoints = [...routeContainer.querySelectorAll('.flex.items-center.gap-4')]
-        .filter(wp => !wp.querySelector('#continue-ofp-btn'));
-      const draggedIndex = allWaypoints.indexOf(draggedElement);
-      const targetIndex = allWaypoints.indexOf(this);
-      
-      if (draggedIndex < targetIndex) {
-        this.parentNode.insertBefore(draggedElement, this.nextSibling);
-      } else {
-        this.parentNode.insertBefore(draggedElement, this);
-      }
-    }
-  }
-  
-  function handleDragEnd(e) {
-    // Remove all drag-related classes
-    this.classList.remove('waypoint-dragging');
-    this.style.cursor = 'grab';
-    
-    // Remove drag-over class from all waypoints
-    const allWaypoints = waypointsContainer.querySelectorAll('.waypoint-item');
-    allWaypoints.forEach(wp => wp.classList.remove('waypoint-drag-over'));
-    
-    // Re-initialize drag and drop after reordering
-    setTimeout(() => {
-      makeWaypointsDraggable();
-      initializeExistingWaypoints();
+      rebuildWaypointDOM();
+      updateWaypointCounter();
       updateCriticalPointDropdown();
       updateRouteLegsDisplay();
-    }, 100);
-  }
-  
-  // Initial setup
-  makeWaypointsDraggable();
-  
-  // Observer to handle dynamically added waypoints
-  const observer = new MutationObserver(() => {
-    makeWaypointsDraggable();
-  });
-  
-  observer.observe(waypointsContainer, {
-    childList: true,
-    subtree: true
+    });
+    
+    waypointElement.querySelector('.waypoint-name').addEventListener('click', function(e) {
+      e.stopPropagation();
+      zoomToWaypoint(wp.name, wp.lat, wp.lng);
+    });
+    
+    waypointsContainer.appendChild(waypointElement);
   });
 }
 
-// Function to update Critical Point dropdown with current planned route waypoints
+// Clean route system - no old validation functions needed
+
+// Simple route diagnostic function
+window.checkRoute = function() {
+  console.log('🔍 Route Status Check:');
+  console.log(`📊 Route Waypoints (${routeWaypoints.length} total):`);
+  routeWaypoints.forEach((wp, index) => {
+    console.log(`  ${index + 1}. ${wp.name} (${wp.lat}, ${wp.lng})`);
+  });
+  
+  if (routeWaypoints.length >= 2) {
+    console.log('\n🛣️ Route Legs:');
+    displayRouteLegs();
+  }
+  
+  return {
+    waypointCount: routeWaypoints.length,
+    waypoints: routeWaypoints.map(wp => wp.name)
+  };
+};
+
+// Clean system test function
+window.testCleanRoute = function() {
+  console.log('🧪 Testing clean route system...');
+  
+  console.log(`📊 Current route: ${routeWaypoints.length} waypoints`);
+  console.log(`📋 Counter shows: ${document.getElementById('waypoint-counter').textContent}`);
+  
+  if (routeWaypoints.length >= 2) {
+    const legs = displayRouteLegs();
+    console.log(`🛣️ Generated ${legs.length} route legs`);
+    return { success: true, waypoints: routeWaypoints.length, legs: legs.length };
+  } else {
+    console.log('ℹ️ Add waypoints to test route leg calculation');
+    return { success: true, waypoints: routeWaypoints.length, legs: 0 };
+  }
+};
+
+// Simple test function for adding waypoints
+window.testAddWaypoint = function() {
+  console.log('🔧 Testing waypoint addition...');
+  
+  const testWaypoint = waypointsData.find(wp => wp.name === 'RCMQ');
+  if (testWaypoint) {
+    console.log('Adding RCMQ as test waypoint...');
+    addToRoute(testWaypoint.name, testWaypoint.lat, testWaypoint.lng);
+  } else {
+    console.log('RCMQ not found in waypoints data');
+  }
+};
+
+// Main validation function - use this to test the system
+window.validateCleanSystem = function() {
+  console.log('🧪 VALIDATING CLEAN ROUTE SYSTEM');
+  console.log('=================================');
+  
+  console.log(`📊 Current state:`);
+  console.log(`  - Route waypoints: ${routeWaypoints.length}`);
+  console.log(`  - Counter display: "${document.getElementById('waypoint-counter').textContent}"`);
+  
+  if (routeWaypoints.length === 0) {
+    console.log('✅ CORRECT: Starting with empty route (0 waypoints)');
+  } else {
+    console.log('❌ ERROR: Route should start empty');
+  }
+  
+  console.log('\n🔍 System ready for testing. Try:');
+  console.log('  - Click waypoints on map to add to route');
+  console.log('  - Run testAddWaypoint() to add RCMQ');
+  console.log('  - Run checkRoute() to see current route');
+  
+  return {
+    success: routeWaypoints.length === 0,
+    routeCount: routeWaypoints.length,
+    counterText: document.getElementById('waypoint-counter').textContent
+  };
+};
+
+// Clean system - no need for legacy waypoint initialization
+
+// Drag and drop removed for simplicity - focus on core functionality
+
+// Function to update Critical Point dropdown with current route waypoints
 function updateCriticalPointDropdown() {
   const criticalPointSelect = document.getElementById('critical-point');
   if (!criticalPointSelect) return;
@@ -773,138 +717,95 @@ function updateCriticalPointDropdown() {
   // Clear existing options except the first one
   criticalPointSelect.innerHTML = '<option value="">Select Critical Point</option>';
   
-  // Get current waypoints from the planned route
-  const currentWaypoints = [];
-  const waypointItems = document.querySelectorAll('#waypoints-container .waypoint-item');
-  
-  waypointItems.forEach(item => {
-    const waypointName = item.dataset.waypointName;
-    if (waypointName && !currentWaypoints.find(wp => wp.name === waypointName)) {
-      currentWaypoints.push({
-        name: waypointName,
-        lat: item.dataset.lat,
-        lng: item.dataset.lng
-      });
-    }
-  });
-  
-  // Add waypoints to dropdown
-  currentWaypoints.forEach(waypoint => {
+  // Add waypoints from routeWaypoints array to dropdown
+  routeWaypoints.forEach(waypoint => {
     const option = document.createElement('option');
     option.value = waypoint.name;
     option.textContent = waypoint.name;
     criticalPointSelect.appendChild(option);
   });
   
-  console.log(`Updated critical point dropdown with ${currentWaypoints.length} waypoints`);
+  console.log(`📋 Updated critical point dropdown with ${routeWaypoints.length} waypoints`);
 }
 
-// Function to display route legs in the OFP summary
+// Function to display route legs using clean routeWaypoints array
 function displayRouteLegs() {
-  // Check if we have access to FlightCalculator (from the modules)
-  if (typeof FlightCalculator === 'undefined') {
-    console.warn('FlightCalculator not available, cannot display route legs');
-    return;
+  console.log('🛣️ Calculating route legs from routeWaypoints array...');
+  
+  if (routeWaypoints.length < 2) {
+    console.log('ℹ️ Need at least 2 waypoints to calculate route legs');
+    return [];
   }
   
-  try {
-    // Get current waypoints from the planned route
-    const currentWaypoints = [];
-    const waypointItems = document.querySelectorAll('#waypoints-container .waypoint-item');
+  console.log('📍 Route sequence:', routeWaypoints.map(wp => wp.name).join(' → '));
+  
+  // Navigation calculation constants
+  const DEG_TO_RAD = Math.PI / 180;
+  const RAD_TO_DEG = 180 / Math.PI;
+  const EARTH_RADIUS_NM = 3443.89849;
+  const MAGNETIC_VARIATION = -5.01; // Taiwan
+  
+  function calculateDistance(lat1, lon1, lat2, lon2) {
+    const φ1 = lat1 * DEG_TO_RAD;
+    const φ2 = lat2 * DEG_TO_RAD;
+    const Δφ = (lat2 - lat1) * DEG_TO_RAD;
+    const Δλ = (lon2 - lon1) * DEG_TO_RAD;
     
-    waypointItems.forEach(item => {
-      const waypointName = item.dataset.waypointName;
-      const lat = parseFloat(item.dataset.lat);
-      const lng = parseFloat(item.dataset.lng);
-      
-      if (waypointName && !isNaN(lat) && !isNaN(lng)) {
-        currentWaypoints.push({
-          name: waypointName,
-          lat: lat,
-          lng: lng
-        });
-      }
-    });
+    const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
+              Math.cos(φ1) * Math.cos(φ2) *
+              Math.sin(Δλ/2) * Math.sin(Δλ/2);
     
-    if (currentWaypoints.length < 2) {
-      console.log('Need at least 2 waypoints to display route legs');
-      return;
-    }
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    const distance = EARTH_RADIUS_NM * c;
     
-    // Create a simple navigation calculator for basic route leg display
-    const DEG_TO_RAD = Math.PI / 180;
-    const RAD_TO_DEG = 180 / Math.PI;
-    const EARTH_RADIUS_NM = 3443.89849;
-    const MAGNETIC_VARIATION = -5.01; // Taiwan
-    
-    function calculateDistance(lat1, lon1, lat2, lon2) {
-      const φ1 = lat1 * DEG_TO_RAD;
-      const φ2 = lat2 * DEG_TO_RAD;
-      const Δφ = (lat2 - lat1) * DEG_TO_RAD;
-      const Δλ = (lon2 - lon1) * DEG_TO_RAD;
-      
-      const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
-                Math.cos(φ1) * Math.cos(φ2) *
-                Math.sin(Δλ/2) * Math.sin(Δλ/2);
-      
-      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-      const distance = EARTH_RADIUS_NM * c;
-      
-      return Math.round(distance * 10) / 10;
-    }
-    
-    function calculateTrueCourse(lat1, lon1, lat2, lon2) {
-      const φ1 = lat1 * DEG_TO_RAD;
-      const φ2 = lat2 * DEG_TO_RAD;
-      const Δλ = (lon2 - lon1) * DEG_TO_RAD;
-      
-      const y = Math.sin(Δλ) * Math.cos(φ2);
-      const x = Math.cos(φ1) * Math.sin(φ2) - 
-                Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ);
-      
-      let bearing = Math.atan2(y, x) * RAD_TO_DEG;
-      bearing = (bearing + 360) % 360;
-      
-      return Math.round(bearing * 10) / 10;
-    }
-    
-    function trueToMagnetic(trueCourse) {
-      let magneticCourse = trueCourse + MAGNETIC_VARIATION;
-      magneticCourse = (magneticCourse + 360) % 360;
-      return Math.round(magneticCourse * 10) / 10;
-    }
-    
-    // Calculate route legs
-    const routeLegs = [];
-    for (let i = 0; i < currentWaypoints.length - 1; i++) {
-      const from = currentWaypoints[i];
-      const to = currentWaypoints[i + 1];
-      
-      const distance = calculateDistance(from.lat, from.lng, to.lat, to.lng);
-      const trueCourse = calculateTrueCourse(from.lat, from.lng, to.lat, to.lng);
-      const magneticCourse = trueToMagnetic(trueCourse);
-      
-      routeLegs.push({
-        from: from.name,
-        to: to.name,
-        distance: distance,
-        magneticCourse: magneticCourse
-      });
-    }
-    
-    console.log('Route legs calculated:', routeLegs);
-    
-    // You can expand this to display the route legs in the UI
-    // For now, we'll just log them to verify the calculations are working
-    routeLegs.forEach((leg, index) => {
-      console.log(`Leg ${index + 1}: ${leg.from} → ${leg.to} | ${leg.distance} NM | ${leg.magneticCourse}° (no M suffix)`);
-    });
-    
-    return routeLegs;
-    
-  } catch (error) {
-    console.error('Error displaying route legs:', error);
+    return Math.round(distance * 10) / 10;
   }
+  
+  function calculateTrueCourse(lat1, lon1, lat2, lon2) {
+    const φ1 = lat1 * DEG_TO_RAD;
+    const φ2 = lat2 * DEG_TO_RAD;
+    const Δλ = (lon2 - lon1) * DEG_TO_RAD;
+    
+    const y = Math.sin(Δλ) * Math.cos(φ2);
+    const x = Math.cos(φ1) * Math.sin(φ2) - 
+              Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ);
+    
+    let bearing = Math.atan2(y, x) * RAD_TO_DEG;
+    bearing = (bearing + 360) % 360;
+    
+    return Math.round(bearing * 10) / 10;
+  }
+  
+  function trueToMagnetic(trueCourse) {
+    let magneticCourse = trueCourse + MAGNETIC_VARIATION;
+    magneticCourse = (magneticCourse + 360) % 360;
+    return Math.round(magneticCourse * 10) / 10;
+  }
+  
+  // Calculate route legs
+  const routeLegs = [];
+  for (let i = 0; i < routeWaypoints.length - 1; i++) {
+    const from = routeWaypoints[i];
+    const to = routeWaypoints[i + 1];
+    
+    const distance = calculateDistance(from.lat, from.lng, to.lat, to.lng);
+    const trueCourse = calculateTrueCourse(from.lat, from.lng, to.lat, to.lng);
+    const magneticCourse = trueToMagnetic(trueCourse);
+    
+    routeLegs.push({
+      from: from.name,
+      to: to.name,
+      distance: distance,
+      magneticCourse: magneticCourse
+    });
+  }
+  
+  console.log(`✅ Route legs calculated: ${routeLegs.length} legs`);
+  routeLegs.forEach((leg, index) => {
+    console.log(`  Leg ${index + 1}: ${leg.from} → ${leg.to} | ${leg.distance} NM | ${leg.magneticCourse}°`);
+  });
+  
+  return routeLegs;
 }
 
 // Function to update route leg display when waypoints change

@@ -548,23 +548,15 @@ class SystemRemasterApp {
    */
   setupModuleCoordination() {
     try {
-      // Update flight calculator when route changes
+      // Update flight calculator when route changes via state management instead of method wrapping
       if (this.modules.waypointManager && this.modules.flightCalculator) {
-        const originalAddToRoute = this.modules.waypointManager.addToRoute.bind(this.modules.waypointManager);
-        this.modules.waypointManager.addToRoute = (waypoint) => {
-          originalAddToRoute(waypoint);
-          // Update route in flight calculator
-          const plannedRoute = this.modules.waypointManager.getPlannedRoute();
-          this.modules.flightCalculator.updateRouteData(plannedRoute);
-        };
-
-        const originalRemoveFromRoute = this.modules.waypointManager.removeFromRoute.bind(this.modules.waypointManager);
-        this.modules.waypointManager.removeFromRoute = (waypointId) => {
-          originalRemoveFromRoute(waypointId);
-          // Update route in flight calculator
-          const plannedRoute = this.modules.waypointManager.getPlannedRoute();
-          this.modules.flightCalculator.updateRouteData(plannedRoute);
-        };
+        // Subscribe to state changes instead of wrapping methods to avoid recursion
+        stateManager.subscribe('flightPlan.route', (newRoute) => {
+          console.log('🧮 Updating flight calculator with new route:', newRoute ? newRoute.length : 0, 'waypoints');
+          this.modules.flightCalculator.updateRouteData(newRoute || []);
+        });
+        
+        console.log('✅ Flight calculator coordination setup via state management');
       }
 
       // Coordinate search with waypoint selection

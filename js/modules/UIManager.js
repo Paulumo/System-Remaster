@@ -312,7 +312,7 @@ export class UIManager {
     // Just ensure flight method is selected for UI consistency
     if (!this.flightMethod) {
       this.showError('Please select a flight method');
-      return false;
+      return true;
     }
     
     return true;
@@ -808,7 +808,7 @@ export class UIManager {
   showOFPSummary(summary, routeAnalysis = null) {
     // Create modal overlay
     const modal = createElement('div', {
-      className: 'fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center',
+      className: 'fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center z-[1001]',
       style: 'backdrop-filter: blur(4px);'
     });
     
@@ -824,7 +824,7 @@ export class UIManager {
     });
     
     const title = createElement('h2', {
-      className: 'text-white text-xl font-bold'
+      className: 'text-white text-xl font-bold z-[10000]'
     }, 'Operational Flight Plan Summary');
     
     const closeBtn = createElement('button', {
