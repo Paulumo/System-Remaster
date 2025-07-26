@@ -56,6 +56,7 @@ This project uses static HTML/CSS/JavaScript without a build system. Development
 ### Before starting work
 - Always in plan mode to make a plan
 - After get the plan, make sure you Write the plan to .claude/tasks/TASK_NAME.md.
+- Create a Todo list to .claude/todo/TO_DO.md and update it on your progression
 - The plan should be a detailed implementation plan and the reasoning behind them, as well as tasks broken down.
 - If the task require external knowledge or certain package, also research to get latest knowledge (Use Task tool for research)
 - Don't over plan it, always think MVP.

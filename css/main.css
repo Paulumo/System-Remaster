@@ -1,0 +1,682 @@
+/**
+ * Main CSS for System Remaster HST
+ * Contains extracted styles and custom CSS properties
+ */
+
+/* CSS Custom Properties (Variables) */
+:root {
+  /* Color Palette */
+  --color-primary: #2563eb;
+  --color-primary-hover: #1d4ed8;
+  --color-primary-light: #b1ccff;
+  --color-primary-dark: #1a2741;
+  --color-secondary: #1e2d4a;
+  
+  --color-success: #10b981;
+  --color-warning: #f59e0b;
+  --color-error: #ef4444;
+  --color-info: #3b82f6;
+  
+  --color-background: #15181e;
+  --color-surface: #1c1f26;
+  --color-surface-secondary: #20242d;
+  --color-surface-tertiary: #2a2f3a;
+  --color-surface-hover: #3a3f4a;
+  
+  --color-text-primary: #ffffff;
+  --color-text-secondary: #a0a9bb;
+  --color-text-muted: #888888;
+  --color-text-accent: #2563eb;
+  
+  --color-border: #2c333f;
+  --color-border-hover: #1a2741;
+  
+  /* Typography */
+  --font-family-primary: 'Space Grotesk', 'Noto Sans', sans-serif;
+  --font-size-xs: 11px;
+  --font-size-sm: 12px;
+  --font-size-base: 14px;
+  --font-size-lg: 16px;
+  --font-size-xl: 18px;
+  --font-size-2xl: 24px;
+  
+  /* Spacing */
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 12px;
+  --spacing-lg: 16px;
+  --spacing-xl: 20px;
+  --spacing-2xl: 24px;
+  
+  /* Dimensions */
+  --border-radius-sm: 6px;
+  --border-radius-md: 8px;
+  --border-radius-lg: 12px;
+  --border-radius-xl: 16px;
+  
+  /* Animations */
+  --transition-fast: 0.1s ease;
+  --transition-normal: 0.2s ease;
+  --transition-slow: 0.3s ease;
+  
+  /* Shadows */
+  --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.1);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.2);
+  --shadow-lg: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+
+/* Base Styles */
+* {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: var(--font-family-primary);
+  background-color: var(--color-background);
+  color: var(--color-text-primary);
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+}
+
+/* Screen Reader Only */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Focus Styles for Accessibility */
+*:focus {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+button:focus,
+input:focus,
+select:focus,
+textarea:focus {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 1px;
+}
+
+/* Skip Links for Accessibility */
+.skip-link {
+  position: absolute;
+  top: -40px;
+  left: 6px;
+  background: var(--color-primary);
+  color: white;
+  padding: 8px;
+  text-decoration: none;
+  border-radius: var(--border-radius-sm);
+  z-index: 10000;
+  transition: top var(--transition-normal);
+}
+
+.skip-link:focus {
+  top: 6px;
+}
+
+/* Component Styles */
+
+/* Waypoint Items */
+.waypoint-item {
+  transition: all var(--transition-normal);
+  cursor: grab;
+}
+
+.waypoint-item:hover {
+  transform: translateX(2px);
+}
+
+.waypoint-item:active {
+  cursor: grabbing;
+}
+
+.waypoint-name:hover {
+  color: var(--color-primary) !important;
+}
+
+.waypoint-item img {
+  flex-shrink: 0;
+}
+
+/* Drag and Drop States */
+.waypoint-dragging {
+  opacity: 0.5;
+  transform: rotate(2deg);
+  z-index: 1000;
+}
+
+.waypoint-drag-over {
+  background: var(--color-primary-dark) !important;
+  transform: scale(1.02);
+  transition: all var(--transition-normal);
+}
+
+/* Waypoint Popup Styles */
+.waypoint-popup {
+  font-family: var(--font-family-primary);
+  min-width: 200px;
+}
+
+.waypoint-name {
+  font-weight: bold;
+  font-size: var(--font-size-base);
+  color: var(--color-primary-dark);
+  margin-bottom: var(--spacing-xs);
+}
+
+.waypoint-coords {
+  font-size: var(--font-size-sm);
+  color: #666;
+  margin-bottom: 2px;
+}
+
+.waypoint-desc {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  margin: var(--spacing-sm) 0;
+  font-style: italic;
+}
+
+.add-to-route-btn {
+  background: var(--color-primary);
+  color: white;
+  border: none;
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-radius: var(--border-radius-sm);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  cursor: pointer;
+  margin-top: var(--spacing-sm);
+  width: 100%;
+  transition: background-color var(--transition-normal);
+}
+
+.add-to-route-btn:hover {
+  background: var(--color-primary-hover);
+}
+
+.add-to-route-btn:focus {
+  outline: 2px solid var(--color-primary-light);
+  outline-offset: 2px;
+}
+
+/* Search Results Styles */
+.search-results-dropdown {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-surface-tertiary) var(--color-surface-secondary);
+}
+
+.search-results-dropdown::-webkit-scrollbar {
+  width: 6px;
+}
+
+.search-results-dropdown::-webkit-scrollbar-track {
+  background: var(--color-surface-secondary);
+}
+
+.search-results-dropdown::-webkit-scrollbar-thumb {
+  background: var(--color-surface-tertiary);
+  border-radius: 3px;
+}
+
+.search-result-item {
+  padding: var(--spacing-md) var(--spacing-lg);
+  border-bottom: 1px solid var(--color-border);
+  cursor: pointer;
+  transition: background-color var(--transition-normal);
+}
+
+.search-result-item:hover,
+.search-result-item.selected {
+  background: var(--color-surface-tertiary);
+}
+
+.search-result-item:last-child {
+  border-bottom: none;
+}
+
+.search-result-item:focus {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
+}
+
+.search-result-name {
+  font-weight: 500;
+  color: var(--color-text-primary);
+  font-size: var(--font-size-base);
+  margin-bottom: var(--spacing-xs);
+}
+
+.search-result-coords {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  margin-bottom: 2px;
+}
+
+.search-result-desc {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  font-style: italic;
+  margin-top: var(--spacing-xs);
+}
+
+.search-no-results {
+  padding: var(--spacing-lg);
+  text-align: center;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-base);
+}
+
+/* Flight Method Buttons */
+.flight-method-btn {
+  display: flex;
+  min-width: 84px;
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: var(--border-radius-md);
+  height: 40px;
+  padding: 0 var(--spacing-md);
+  font-size: var(--font-size-sm);
+  font-weight: bold;
+  line-height: normal;
+  transition: all var(--transition-normal);
+  letter-spacing: 0.1em;
+  border: 2px solid transparent;
+}
+
+.flight-method-btn:focus {
+  border-color: var(--color-primary);
+}
+
+.flight-method-inactive {
+  background: var(--color-surface-tertiary);
+  color: var(--color-text-primary);
+}
+
+.flight-method-inactive:hover {
+  background: var(--color-surface-hover);
+}
+
+.flight-method-active {
+  background: var(--color-primary-light);
+  color: #000000;
+}
+
+.flight-method-active:hover {
+  background: #7b8eb2;
+}
+
+/* Form Input Styles */
+.form-input {
+  background: var(--color-surface-secondary);
+  color: var(--color-text-primary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--border-radius-md);
+  padding: var(--spacing-md);
+  font-size: var(--font-size-base);
+  font-family: var(--font-family-primary);
+  transition: border-color var(--transition-normal);
+  width: 100%;
+}
+
+.form-input:focus {
+  border-color: var(--color-primary);
+  outline: none;
+}
+
+.form-input::placeholder {
+  color: var(--color-text-secondary);
+}
+
+/* Form Input States */
+.form-input.error {
+  border-color: var(--color-error);
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.form-input.success {
+  border-color: var(--color-success);
+}
+
+/* Field Error Styles */
+.field-error {
+  color: var(--color-error);
+  font-size: var(--font-size-sm);
+  margin-top: var(--spacing-xs);
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
+.field-error::before {
+  content: '⚠';
+  font-size: var(--font-size-base);
+}
+
+/* Button Styles */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-md) var(--spacing-lg);
+  border-radius: var(--border-radius-md);
+  font-size: var(--font-size-base);
+  font-weight: 500;
+  font-family: var(--font-family-primary);
+  cursor: pointer;
+  border: none;
+  transition: all var(--transition-normal);
+  text-decoration: none;
+  gap: var(--spacing-sm);
+}
+
+.btn:focus {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background: var(--color-primary);
+  color: white;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--color-primary-hover);
+}
+
+.btn-secondary {
+  background: var(--color-surface-tertiary);
+  color: var(--color-text-primary);
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: var(--color-surface-hover);
+}
+
+.btn-success {
+  background: var(--color-success);
+  color: white;
+}
+
+.btn-warning {
+  background: var(--color-warning);
+  color: white;
+}
+
+.btn-error {
+  background: var(--color-error);
+  color: white;
+}
+
+/* Loading States */
+.loading-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid transparent;
+  border-top: 2px solid currentColor;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Notification Styles */
+.notification {
+  position: fixed;
+  top: var(--spacing-xl);
+  right: var(--spacing-xl);
+  padding: var(--spacing-md) var(--spacing-lg);
+  border-radius: var(--border-radius-md);
+  color: white;
+  font-size: var(--font-size-base);
+  font-weight: 500;
+  box-shadow: var(--shadow-md);
+  z-index: 10000;
+  max-width: 400px;
+  animation: slideIn 0.3s ease;
+}
+
+.notification.success {
+  background: var(--color-success);
+}
+
+.notification.warning {
+  background: var(--color-warning);
+}
+
+.notification.error {
+  background: var(--color-error);
+}
+
+.notification.info {
+  background: var(--color-info);
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+/* Custom Leaflet Popup Styles */
+.leaflet-popup-content-wrapper {
+  border-radius: var(--border-radius-md);
+  box-shadow: var(--shadow-md);
+}
+
+.leaflet-popup-content {
+  margin: var(--spacing-md);
+}
+
+.leaflet-popup-tip {
+  background: white;
+}
+
+/* Current Location Marker */
+.current-location-marker {
+  width: 20px;
+  height: 20px;
+  background: var(--color-primary);
+  border: 3px solid white;
+  border-radius: 50%;
+  box-shadow: var(--shadow-sm);
+}
+
+/* Map Controls */
+.map-control {
+  background: var(--color-surface-secondary);
+  border: none;
+  border-radius: var(--border-radius-sm);
+  color: var(--color-text-primary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color var(--transition-normal);
+  box-shadow: var(--shadow-sm);
+}
+
+.map-control:hover {
+  background: var(--color-surface-tertiary);
+}
+
+.map-control:focus {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.map-control:first-child {
+  border-radius: var(--border-radius-sm) var(--border-radius-sm) 0 0;
+}
+
+.map-control:last-child {
+  border-radius: 0 0 var(--border-radius-sm) var(--border-radius-sm);
+}
+
+.map-control.single {
+  border-radius: 50%;
+}
+
+/* Performance Results Display */
+.performance-display {
+  background: linear-gradient(135deg, var(--color-surface-secondary) 0%, #1a1e26 100%);
+  border: 2px solid rgba(22, 163, 74, 0.3);
+  border-radius: var(--border-radius-xl);
+  padding: var(--spacing-2xl);
+  box-shadow: var(--shadow-lg);
+}
+
+.performance-metric {
+  text-align: center;
+}
+
+.performance-icon {
+  width: 64px;
+  height: 64px;
+  background: rgba(37, 99, 235, 0.2);
+  border: 2px solid rgba(37, 99, 235, 0.5);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto var(--spacing-md);
+}
+
+.performance-value {
+  font-size: 48px;
+  font-weight: bold;
+  margin-bottom: var(--spacing-sm);
+}
+
+.performance-value.hoge {
+  color: var(--color-primary);
+}
+
+.performance-value.payload {
+  color: var(--color-success);
+}
+
+.performance-label {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  :root {
+    --spacing-lg: 12px;
+    --spacing-xl: 16px;
+    --spacing-2xl: 20px;
+  }
+  
+  .notification {
+    top: var(--spacing-md);
+    right: var(--spacing-md);
+    left: var(--spacing-md);
+    max-width: none;
+  }
+  
+  .performance-display {
+    padding: var(--spacing-lg);
+  }
+  
+  .performance-value {
+    font-size: 36px;
+  }
+}
+
+/* Print Styles */
+@media print {
+  .map-control,
+  .notification,
+  .search-results-dropdown {
+    display: none !important;
+  }
+  
+  .performance-display {
+    border: 1px solid #000;
+    background: white !important;
+    color: black !important;
+  }
+  
+  .performance-value {
+    color: black !important;
+  }
+}
+
+/* High Contrast Mode Support */
+@media (prefers-contrast: high) {
+  :root {
+    --color-border: #ffffff;
+    --color-text-secondary: #ffffff;
+  }
+  
+  .form-input {
+    border-width: 2px;
+  }
+  
+  .btn {
+    border: 2px solid currentColor;
+  }
+}
+
+/* Reduced Motion Support */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  
+  .loading-spinner {
+    animation: none;
+    border: 2px solid currentColor;
+  }
+}
+
+/* Dark Mode (already default, but explicit for future light mode) */
+@media (prefers-color-scheme: dark) {
+  /* Already using dark theme as default */
+}
+
+/* Focus Visible for Better Keyboard Navigation */
+@supports selector(:focus-visible) {
+  *:focus {
+    outline: none;
+  }
+  
+  *:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+  }
+}

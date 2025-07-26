@@ -1,30 +1,30 @@
 # 1. Project Planning
 
-/design -- api -- ddd -- plan -- persona-architect
+/design --api --ddd --plan --persona-architect
 
 # 2. Frontend Development
 
-/build -- react -- magic -- tdd -- persona-frontend
+/build --react --magic --tdd --persona-frontend
 
 # 3. Backend Development
 
-/build Y-api -- tdd -- coverage -- persona-backend
+/build Y-api --tdd --coverage --persona-backend
 
 # 4. Quality Check
 
-/review -- quality -- evidence -- persona-qa
+/review --quality --evidence --persona-qa
 
 # 5. Security Scan
 
-/scan -- security -- owasp -- persona-security
+/scan --security --owasp --persona-security
 
 # 6. Performance Optimization
 
-/improve -- performance -iterate -persona-performance
+/improve --performance -iterate -persona-performance
 
 # 7. Deployment Preparation
 
-/deploy -- env staging -- plan -- persona-architect
+/deploy --env staging --plan --persona-architect
 
 
 
@@ -33,19 +33,19 @@ Troubleshoot
 
 # 1. Problem Analysis
 
-/troubleshoot -- investigate -- prod -- persona-analyzer
+/troubleshoot --investigate --prod --persona-analyzer
 
 # 2. Root Cause Analysis
 
-/troubleshoot -- prod -- five-whys -- seq -- persona-analyzer
+/troubleshoot --prod --five-whys --seq --persona-analyzer
 
 # 3. Performance Analysis
 
-/analyze -- profile -- perf -- seq -- persona-performance
+/analyze --profile --perf --seq --persona-performance
 
 # 4. Fix Implementation
 
-/improve -- quality -- threshold 95% -- persona-refactorer
+/improve --quality --threshold 95% --persona-refactorer
 
 
 
