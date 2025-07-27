@@ -87,8 +87,23 @@
           </div>
           
           <section aria-labelledby="planned-route-heading">
-            <h3 id="planned-route-heading" class="sidebar-subtitle text-white text-lg font-bold leading-tight tracking-[-0.015em] px-4 pb-2 pt-4">Planned Route</h3>
-            <div id="waypoint-counter" class="waypoint-counter px-4 pb-2" role="status" aria-live="polite">
+            <div class="flex items-center justify-between px-4 pb-2 pt-4">
+              <h3 id="planned-route-heading" class="sidebar-subtitle text-white text-lg font-bold leading-tight tracking-[-0.015em]">Planned Route</h3>
+              <button
+                id="clear-all-btn"
+                class="clear-all-btn bg-transparent hover:bg-[#2a2f3a] text-[#a0a9bb] hover:text-[#ef4444] text-xs font-medium py-1.5 px-3 rounded-md border border-[#3a3f4a] hover:border-[#ef4444]/30 transition-all duration-200 cursor-pointer group"
+                title="Clear all waypoints from route"
+              >
+                <span class="flex items-center gap-1.5">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="currentColor" viewBox="0 0 256 256" class="group-hover:scale-110 transition-transform duration-200">
+                    <path d="M205.66,194.34a8,8,0,0,1-11.32,11.32L128,139.31,61.66,205.66a8,8,0,0,1-11.32-11.32L116.69,128,50.34,61.66A8,8,0,0,1,61.66,50.34L128,116.69l66.34-66.35a8,8,0,0,1,11.32,11.32L139.31,128Z"/>
+                  </svg>
+                  Clear All
+                </span>
+              </button>
+            </div>
+            <!-- Waypoint counter removed from UI, but kept in console logging -->
+            <div id="waypoint-counter" class="waypoint-counter px-4 pb-2 hidden" role="status" aria-live="polite">
               <span class="text-[#a0a9bb] text-sm">Loading waypoints...</span>
             </div>
             
@@ -99,7 +114,26 @@
               
             </div>
 
-            
+            <!-- Preset Route Buttons -->
+            <div class="preset-routes-section px-4 py-3 border-t border-[#3a3f4a]">
+              <h4 class="text-white text-sm font-semibold mb-2">Preset Routes</h4>
+              <div class="flex gap-2">
+                <button
+                  id="preset-gch-btn"
+                  class="btn-preset flex-1 bg-[#2563eb] hover:bg-[#1d4ed8] text-white text-sm font-semibold py-2 px-3 rounded-md transition-colors cursor-pointer"
+                  title="Load GCH route: RCMQ → Dadu → CH1A01 → Dadu → RCMQ"
+                >
+                  GCH
+                </button>
+                <button
+                  id="preset-trn-btn"
+                  class="btn-preset flex-1 bg-[#2563eb] hover:bg-[#1d4ed8] text-white text-sm font-semibold py-2 px-3 rounded-md transition-colors cursor-pointer"
+                  title="Load TRN route: RCMQ → System → Libao → System → RCMQ"
+                >
+                  TRN
+                </button>
+              </div>
+            </div>
 
             <div class="sidebar-footer flex px-4 py-3">
               <button
@@ -381,7 +415,7 @@
           <!-- Section 3: Fuel Calculation -->
         <div class="calculation-section space-y-6 lg:col-start-3 lg:row-start-1 lg:row-span-2">
             <div class="section-header flex items-center gap-3 mb-4">
-              <div class="step-number w-8 h-8 bg-[#2563eb] rounded-full flex items-center justify-center text-white font-bold text-sm">3</div>
+              <div class="step-number w-8 h-8 bg-[#f59e0b] rounded-full flex items-center justify-center text-white font-bold text-sm">4</div>
               <h3 class="section-subtitle text-white text-lg font-semibold tracking-wide">Fuel Calculation</h3>
             </div>
             
@@ -433,7 +467,7 @@
             <div class="input-group flex items-center justify-between">
               <label for="discretion-fuel" class="input-label-text text-white text-base font-medium">Discretion</label>
               <div class="input-controls flex items-center gap-2">
-                <input type="number" id="discretion-fuel" name="discretion-fuel" class="input-field w-24 h-10 bg-[#15181e] border border-[#2c333f] rounded-lg text-white text-center focus:outline-none focus:border-[#2563eb] transition-colors" placeholder="50" min="0" max="500" aria-describedby="discretion-fuel-unit" />
+                <input type="number" id="discretion-fuel" name="discretion-fuel" class="input-field w-24 h-10 bg-[#15181e] border border-[#2c333f] rounded-lg text-white text-center focus:outline-none focus:border-[#2563eb] transition-colors" placeholder="50" value="50" min="0" max="500" aria-describedby="discretion-fuel-unit" />
                 <span id="discretion-fuel-unit" class="input-unit text-[#a0a9bb] text-lg">kg</span>
               </div>
             </div>
@@ -454,8 +488,8 @@
           <!-- Section 4: Hoisting Selection -->
           <div class="calculation-section space-y-6 lg:col-span-2 lg:col-start-1 lg:row-start-2">
             <div class="section-header flex items-center gap-3 mb-4">
-              <div class="step-number w-8 h-8 bg-[#f59e0b] rounded-full flex items-center justify-center text-white font-bold text-sm">4</div>
-              <h3 class="section-subtitle text-white text-lg font-semibold tracking-wide">Hoisting Data</h3>
+              <div class="step-number w-8 h-8 bg-[#2563eb] rounded-full flex items-center justify-center text-white font-bold text-sm">3</div>
+              <h3 class="section-subtitle text-white text-lg font-semibold tracking-wide">Hoisting Time</h3>
             </div>
 
             <!-- <div class="bg-[#20242d] rounded-lg p-4 border border-[#2c333f]"> -->
@@ -481,7 +515,7 @@
                     <label for="hoisting-time" class="input-label-text text-white text-base font-semibold mb-1 block">Hoisting Time</label>
                   </div>
                   <div class="input-controls flex items-center gap-2">
-                    <input type="number" id="hoisting-time" name="hoisting-time" class="input-field w-24 h-10 bg-[#15181e] border border-[#2c333f] rounded-lg text-white text-center focus:outline-none focus:border-[#2563eb] transition-colors" placeholder="10" min="0" max="120" />
+                    <input type="number" id="hoisting-time" name="hoisting-time" class="input-field w-24 h-10 bg-[#15181e] border border-[#2c333f] rounded-lg text-white text-center focus:outline-none focus:border-[#2563eb] transition-colors" value="0" min="0" />
                     <span class="text-[#a0a9bb] text-sm">mins</span>
                   </div>
                 </div>

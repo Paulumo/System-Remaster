@@ -148,17 +148,78 @@ textarea:focus {
   flex-shrink: 0;
 }
 
-/* Drag and Drop States */
+/* Drag and Drop States - Simplified */
 .waypoint-dragging {
-  opacity: 0.5;
-  transform: rotate(2deg);
+  opacity: 0.6;
+  transform: scale(1.02);
   z-index: 1000;
+  border: 1px solid var(--color-primary);
+  transition: all 0.1s ease;
 }
 
 .waypoint-drag-over {
   background: var(--color-primary-dark) !important;
+  border: 1px solid var(--color-primary);
+  transition: all 0.15s ease;
+}
+
+/* Drop Success Animation - Simplified */
+.waypoint-drop-success {
+  background: var(--color-success) !important;
+  transition: background-color 0.3s ease;
+}
+
+/* Drop Target Indicator - Simplified */
+.waypoint-drop-target {
+  background: var(--color-primary-dark) !important;
+  border: 1px solid var(--color-primary);
+  transition: all 0.15s ease;
+}
+
+/* Position Change Animation - Simplified */
+.waypoint-position-change {
+  background: var(--color-info) !important;
+  transition: background-color 0.2s ease;
+}
+
+/* Reorder Complete Animation - Simplified */
+.waypoint-reorder-complete {
+  background: var(--color-success) !important;
+  transition: background-color 0.4s ease;
+}
+
+/* Drag Invalid Animation - Simplified */
+.waypoint-drag-invalid {
+  background: var(--color-error) !important;
+  border: 1px solid var(--color-error);
+  transition: all 0.2s ease;
+}
+
+/* Smooth Insert Animation - Simplified */
+.waypoint-smooth-insert {
   transform: scale(1.02);
-  transition: all var(--transition-normal);
+  transition: transform 0.2s ease;
+}
+
+/* Hover Enhancement */
+.waypoint-item:hover:not(.waypoint-dragging) {
+  transform: translateX(4px) scale(1.02);
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.2);
+  border-left: 3px solid var(--color-primary);
+}
+
+/* Simplified Visual Feedback Classes */
+.drag-handle {
+  opacity: 0.6;
+  transition: opacity 0.2s ease;
+}
+
+.waypoint-item:hover .drag-handle {
+  opacity: 1;
+}
+
+.waypoint-dragging .drag-handle {
+  opacity: 1;
 }
 
 /* Waypoint Popup Styles */
@@ -661,6 +722,22 @@ textarea:focus {
   .loading-spinner {
     animation: none;
     border: 2px solid currentColor;
+  }
+  
+  /* Keep simple transitions for reduced motion */
+  .waypoint-dragging {
+    opacity: 0.6;
+    transform: scale(1.02);
+    border: 1px solid var(--color-primary);
+  }
+  
+  .waypoint-drop-success,
+  .waypoint-reorder-complete,
+  .waypoint-position-change,
+  .waypoint-smooth-insert {
+    background: var(--color-success) !important;
+    transform: scale(1.02);
+    transition: all 0.2s ease;
   }
 }
 

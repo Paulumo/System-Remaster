@@ -48,6 +48,12 @@ export const CONFIG = {
     WAYPOINT_ITEM: 'waypoint-item flex items-center gap-4 bg-[#2a2f3a] mx-4 mb-2 rounded-lg px-4 min-h-14 justify-between',
     WAYPOINT_DRAGGING: 'waypoint-dragging',
     WAYPOINT_DRAG_OVER: 'waypoint-drag-over',
+    WAYPOINT_DROP_TARGET: 'waypoint-drop-target',
+    WAYPOINT_DROP_SUCCESS: 'waypoint-drop-success',
+    WAYPOINT_REORDER_COMPLETE: 'waypoint-reorder-complete',
+    WAYPOINT_POSITION_CHANGE: 'waypoint-position-change',
+    WAYPOINT_SMOOTH_INSERT: 'waypoint-smooth-insert',
+    WAYPOINT_DRAG_INVALID: 'waypoint-drag-invalid',
     FLIGHT_METHOD_ACTIVE: 'flex min-w-[84px] cursor-pointer items-center justify-center overflow-hidden rounded-lg h-10 px-3 bg-[#b1ccff] text-black text-sm font-bold leading-normal hover:bg-[#7b8eb2] transition-colors tracking-widest',
     FLIGHT_METHOD_INACTIVE: 'flex min-w-[84px] cursor-pointer items-center justify-center overflow-hidden rounded-lg h-10 px-3 bg-[#2a2f3a] text-white text-sm font-bold leading-normal hover:bg-[#3a3f4a] transition-colors tracking-widest'
   },

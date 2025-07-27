@@ -487,8 +487,26 @@ function addToRoute(name, lat, lng) {
   waypointElement.dataset.routeIndex = routeWaypoints.length - 1; // Store array index
   waypointElement.innerHTML = `
     <div class="drag-handle text-[#a0a9bb] mr-2 cursor-grab">
-      <svg xmlns="http://www.w3.org/2000/svg" width="16px" height="16px" fill="currentColor" viewBox="0 0 256 256">
-        <path d="M104,64a8,8,0,0,1,8-8h32a8,8,0,0,1,0,16H112A8,8,0,0,1,104,64Zm8,56h32a8,8,0,0,0,0-16H112a8,8,0,0,0,0,16Zm32,32H112a8,8,0,0,0,0,16h32a8,8,0,0,0,0-16Zm0,40H112a8,8,0,0,0,0,16h32a8,8,0,0,0,0-16Z"></path>
+      <svg width="16" height="16" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="currentColor">
+        <path d="
+          M6 3.5
+          a1.5 1.5 0 1 0 0.001 0
+
+          M6 10.5
+          a1.5 1.5 0 1 0 0.001 0
+
+          M6 17.5
+          a1.5 1.5 0 1 0 0.001 0
+
+          M18 3.5
+          a1.5 1.5 0 1 0 0.001 0
+
+          M18 10.5
+          a1.5 1.5 0 1 0 0.001 0
+
+          M18 17.5
+          a1.5 1.5 0 1 0 0.001 0
+        " />
       </svg>
     </div>
     <img src="${iconPath}" alt="Tag" class="w-4 h-4 flex-shrink-0" />
@@ -587,8 +605,26 @@ function rebuildWaypointDOM() {
     waypointElement.dataset.routeIndex = index;
     waypointElement.innerHTML = `
       <div class="drag-handle text-[#a0a9bb] mr-2 cursor-grab">
-        <svg xmlns="http://www.w3.org/2000/svg" width="16px" height="16px" fill="currentColor" viewBox="0 0 256 256">
-          <path d="M104,64a8,8,0,0,1,8-8h32a8,8,0,0,1,0,16H112A8,8,0,0,1,104,64Zm8,56h32a8,8,0,0,0,0-16H112a8,8,0,0,0,0,16Zm32,32H112a8,8,0,0,0,0,16h32a8,8,0,0,0,0-16Zm0,40H112a8,8,0,0,0,0,16h32a8,8,0,0,0,0-16Z"></path>
+        <svg width="16" height="16" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="currentColor">
+          <path d="
+            M6 3.5
+            a1.5 1.5 0 1 0 0.001 0
+
+            M6 10.5
+            a1.5 1.5 0 1 0 0.001 0
+
+            M6 17.5
+            a1.5 1.5 0 1 0 0.001 0
+
+            M18 3.5
+            a1.5 1.5 0 1 0 0.001 0
+
+            M18 10.5
+            a1.5 1.5 0 1 0 0.001 0
+
+            M18 17.5
+            a1.5 1.5 0 1 0 0.001 0
+          " />
         </svg>
       </div>
       <img src="${iconPath}" alt="Tag" class="w-4 h-4 flex-shrink-0" />

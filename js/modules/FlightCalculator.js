@@ -64,6 +64,9 @@ export class FlightCalculator {
       timestamp: null
     };
     
+    // UI update callback
+    this.uiUpdateCallback = null;
+    
     this.isInitialized = false;
   }
 
@@ -78,6 +81,29 @@ export class FlightCalculator {
     } catch (error) {
       console.error('Failed to initialize FlightCalculator:', error);
       throw error;
+    }
+  }
+
+  /**
+   * Set UI update callback for automatic display updates
+   * @param {Function} callback - Function to call when calculations update
+   */
+  setUIUpdateCallback(callback) {
+    this.uiUpdateCallback = callback;
+  }
+
+  /**
+   * Notify UI to update after calculations
+   * @private
+   */
+  notifyCalculationUpdate() {
+    try {
+      if (this.uiUpdateCallback && typeof this.uiUpdateCallback === 'function') {
+        console.log('🔄 Triggering UI update after calculation');
+        this.uiUpdateCallback();
+      }
+    } catch (error) {
+      console.error('Error notifying UI update:', error);
     }
   }
 
@@ -213,10 +239,86 @@ export class FlightCalculator {
       this.calculateFuel();
       this.calculatePerformance();
       
+      // Trigger UI update after route calculations
+      this.notifyCalculationUpdate();
+      
       console.log(`Route updated: ${waypoints.length} waypoints, ${routeCalculation.summary.totalDistance.toFixed(1)} NM, ${routeCalculation.summary.totalFlightTime} min`);
       
     } catch (error) {
       console.error('Error updating route data:', error);
+    }
+  }
+
+  /**
+   * Get hoisting time from UI input
+   * @returns {number} Hoisting time in minutes
+   */
+  getHoistingTime() {
+    try {
+      const hoistingInput = document.getElementById('hoisting-time');
+      if (!hoistingInput) {
+        return 0;
+      }
+      
+      const hoistingTime = parseInt(hoistingInput.value) || 0;
+      return Math.max(0, hoistingTime); // Ensure non-negative, no upper limit
+      
+    } catch (error) {
+      console.error('Error getting hoisting time:', error);
+      return 0;
+    }
+  }
+
+  /**
+   * Get critical point from UI dropdown
+   * @returns {string} Selected critical point or 'Not identified'
+   */
+  getCriticalPointFromUI() {
+    try {
+      const criticalPointSelect = document.getElementById('critical-point');
+      if (!criticalPointSelect) {
+        return 'Not identified';
+      }
+      
+      const selectedValue = criticalPointSelect.value;
+      if (!selectedValue || selectedValue === '') {
+        return 'Not identified';
+      }
+      
+      // CRITICAL FIX: Handle both route IDs and original waypoint IDs
+      // For route IDs (route_wp_Name_...), extract the waypoint name
+      if (selectedValue.startsWith('route_wp_')) {
+        const parts = selectedValue.split('_');
+        if (parts.length >= 3) {
+          return parts[2]; // Return waypoint name from route ID
+        }
+      }
+      
+      // For original waypoint IDs (wp_Name_lat_lng_format)
+      if (selectedValue.startsWith('wp_')) {
+        const parts = selectedValue.split('_');
+        if (parts.length >= 2) {
+          return parts[1]; // Return just the waypoint name
+        }
+      }
+      
+      // If not in expected format, return the selected text from option
+      const selectedOption = criticalPointSelect.selectedOptions[0];
+      if (selectedOption && selectedOption.textContent) {
+        // Extract name from "1. Waypoint Name" format
+        const optionText = selectedOption.textContent.trim();
+        const match = optionText.match(/^\d+\.\s*(.+)$/);
+        if (match) {
+          return match[1]; // Return waypoint name without sequence number
+        }
+        return optionText;
+      }
+      
+      return selectedValue;
+      
+    } catch (error) {
+      console.error('Error getting critical point from UI:', error);
+      return 'Not identified';
     }
   }
 
@@ -314,9 +416,11 @@ export class FlightCalculator {
   calculateFuel() {
     try {
       const route = this.flightData.route;
-      const totalFlightTime = route.totalFlightTime || 0;
+      const routeFlightTime = route.totalFlightTime || 0;
+      const hoistingTime = this.getHoistingTime();
+      const totalFlightTime = routeFlightTime + hoistingTime;
       
-      if (totalFlightTime === 0) {
+      if (routeFlightTime === 0) {
         console.warn('No route data available for fuel calculation');
         return {
           success: false,
@@ -324,7 +428,9 @@ export class FlightCalculator {
         };
       }
       
-      // Calculate trip fuel based on actual flight time
+      console.log(`💡 Fuel calculation: Route time ${routeFlightTime} min + Hoisting time ${hoistingTime} min = Total ${totalFlightTime} min`);
+      
+      // Calculate trip fuel based on actual flight time including hoisting
       const tripFuel = this.fuelCalculator.calculateTripFuel(totalFlightTime);
       
       // Calculate total fuel with all components
@@ -619,12 +725,14 @@ export class FlightCalculator {
    */
   generateFlightSummary() {
     const data = this.flightData;
+    const hoistingTime = this.getHoistingTime();
+    const totalTimeWithHoisting = data.route.totalFlightTime + hoistingTime;
     
     return {
       route: {
         waypointCount: data.route.waypoints.length,
         totalDistance: `${data.route.totalDistance.toFixed(1)} NM`,
-        totalFlightTime: `${data.route.totalFlightTime} min`,
+        totalFlightTime: `${totalTimeWithHoisting} min`,
         legs: data.route.legs.map(leg => ({
           from: leg.from,
           to: leg.to,
@@ -632,7 +740,7 @@ export class FlightCalculator {
           course: `${leg.magneticCourse}°M`,
           time: `${leg.flightTime} min`
         })),
-        criticalPoint: data.performance.criticalPointAnalysis.waypoint
+        criticalPoint: this.getCriticalPointFromUI()
       },
       crew: {
         totalWeight: `${data.performance.totalCrewWeight} kg`,

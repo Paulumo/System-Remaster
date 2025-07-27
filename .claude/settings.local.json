@@ -3,8 +3,37 @@
     "allow": [
       "mcp__sequential-thinking__sequentialthinking",
       "Bash(mkdir:*)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(node:*)",
+      "Bash(ls:*)",
+      "Bash(dir \"C:\\Users\\Pablo.MONT\\.claude\\hooks\")",
+      "Bash(python3:*)",
+      "Bash(cp:*)"
     ],
     "deny": []
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"C:\\Users\\Pablo.MONT\\OneDrive - Heliservice\\Docs\\py\\System Remaster\\.claude\\hooks\\hook_handler.py\""
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"C:\\Users\\Pablo.MONT\\OneDrive - Heliservice\\Docs\\py\\System Remaster\\.claude\\hooks\\hook_handler.py\""
+          }
+        ]
+      }
+    ]
   }
 }

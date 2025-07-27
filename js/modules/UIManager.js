@@ -17,6 +17,15 @@ export class UIManager {
     this.eventCleanupFunctions = [];
     this.stateUnsubscribeFunctions = [];
     this.isInitialized = false;
+    this.needsCalculationUpdate = false;
+    
+    // Set up automatic UI updates when FlightCalculator completes calculations
+    if (this.flightCalculator && typeof this.flightCalculator.setUIUpdateCallback === 'function') {
+      this.flightCalculator.setUIUpdateCallback(() => {
+        this.autoUpdateCalculationDisplay();
+      });
+      console.log('✅ FlightCalculator UI update callback connected');
+    }
   }
 
   /**
@@ -278,6 +287,11 @@ export class UIManager {
         calculationPanel.setAttribute('aria-hidden', 'false');
         this.currentPanel = 'calculation';
         
+        // Always perform calculations when showing calculation panel to ensure current data
+        console.log('🔄 Updating calculation display on panel switch');
+        this.performCalculations();
+        this.needsCalculationUpdate = false;
+        
         // Scroll to the calculation panel smoothly
         setTimeout(() => {
           scrollToElement(calculationPanel);
@@ -439,6 +453,29 @@ export class UIManager {
       this.eventCleanupFunctions.push(cleanup3);
     }
     
+    // Hoisting time input - auto-trigger calculations
+    const hoistingTimeInput = domCache.get('#hoisting-time');
+    if (hoistingTimeInput) {
+      const cleanup4 = addEventListenerWithCleanup(hoistingTimeInput, 'input', () => {
+        const hoistingTime = parseInt(hoistingTimeInput.value) || 0;
+        console.log(`🕐 Hoisting time changed to ${hoistingTime} minutes, triggering recalculation`);
+        
+        // Update any display elements immediately if needed
+        if (this.currentPanel === 'calculation') {
+          this.performCalculations();
+        }
+      });
+      this.eventCleanupFunctions.push(cleanup4);
+      
+      // Also trigger on blur to ensure calculation happens when user leaves field
+      const cleanup5 = addEventListenerWithCleanup(hoistingTimeInput, 'blur', () => {
+        if (this.currentPanel === 'calculation') {
+          this.performCalculations();
+        }
+      });
+      this.eventCleanupFunctions.push(cleanup5);
+    }
+    
     // Weight inputs
     const weightInputs = ['#pic-weight', '#sic-weight', '#hop-weight'];
     weightInputs.forEach(selector => {
@@ -462,6 +499,31 @@ export class UIManager {
         this.eventCleanupFunctions.push(cleanup);
       }
     });
+  }
+
+  /**
+   * Auto-update calculation display when FlightCalculator completes calculations
+   * @private
+   */
+  autoUpdateCalculationDisplay() {
+    try {
+      if (!this.flightCalculator) {
+        console.warn('FlightCalculator not available for auto-update');
+        return;
+      }
+      
+      // Update immediately if we're on calculation panel, or store flag for later
+      if (this.currentPanel === 'calculation') {
+        console.log('🔄 Auto-updating calculation display');
+        this.performCalculations();
+      } else {
+        console.log('💡 Calculation completed, but not on calculation panel - will update when panel opens');
+        this.needsCalculationUpdate = true;
+      }
+      
+    } catch (error) {
+      console.error('Error in auto-update calculation display:', error);
+    }
   }
 
   /**

@@ -5,6 +5,7 @@
 
 import { CONFIG } from '../config.js';
 import { domCache, addEventListenerWithCleanup } from './utils/dom.js';
+import { stateManager } from './StateManager.js';
 
 export class DragDropManager {
   constructor(waypointManager) {
@@ -195,14 +196,18 @@ export class DragDropManager {
    * @param {DragEvent} e - Drag event
    * @param {HTMLElement} waypoint - Waypoint element
    */
-  handleDragOver(e) {
+  handleDragOver(e, waypoint) {
     try {
       e.preventDefault();
       e.dataTransfer.dropEffect = 'move';
       
+      // Clear previous drop targets
+      this.clearDropTargets();
+      
       // Add visual feedback for drop target
       if (waypoint !== this.draggedElement) {
         waypoint.classList.add(CONFIG.CLASSES.WAYPOINT_DRAG_OVER);
+        waypoint.classList.add(CONFIG.CLASSES.WAYPOINT_DROP_TARGET);
         this.dropTarget = waypoint;
       }
       
@@ -222,6 +227,7 @@ export class DragDropManager {
       // Only remove class if we're actually leaving the element
       if (!waypoint.contains(e.relatedTarget)) {
         waypoint.classList.remove(CONFIG.CLASSES.WAYPOINT_DRAG_OVER);
+        waypoint.classList.remove(CONFIG.CLASSES.WAYPOINT_DROP_TARGET);
         if (this.dropTarget === waypoint) {
           this.dropTarget = null;
         }
@@ -243,21 +249,38 @@ export class DragDropManager {
       e.preventDefault();
       
       if (!this.draggedElement || waypoint === this.draggedElement) {
+        this.handleInvalidDrop();
         return;
       }
       
-      // Perform the reorder
+      // Store the dragged element's data for finding it after reorder
+      const draggedName = this.draggedElement.dataset.waypointName;
+      
+      // Perform the reorder first
       this.reorderWaypoints(this.draggedIndex, targetIndex);
       
+      // Find the moved element at its new position and show animations
+      setTimeout(() => {
+        const movedElement = this.findMovedElement(draggedName, targetIndex);
+        if (movedElement) {
+          this.showDropSuccess(movedElement);
+          
+          // Show completion animation after success animation
+          setTimeout(() => {
+            this.showReorderComplete(movedElement);
+          }, 100);
+        }
+      }, 50);
+      
       // Announce success to screen readers
-      const draggedName = this.draggedElement.dataset.waypointName || (this.draggedIndex + 1);
       const targetName = waypoint.dataset.waypointName || (targetIndex + 1);
-      this.announceToScreenReader(`Moved waypoint ${draggedName} to position ${targetIndex + 1}, after ${targetName}`);
+      this.announceToScreenReader(`Successfully moved waypoint ${draggedName || (this.draggedIndex + 1)} to position ${targetIndex + 1}`);
       
       console.log(`Dropped waypoint at index ${targetIndex}`);
       
     } catch (error) {
       console.error('Error in drop:', error);
+      this.handleInvalidDrop();
       this.showError(CONFIG.ERRORS.DRAG_DROP_ERROR || 'Error reordering waypoints');
     }
   }
@@ -270,23 +293,22 @@ export class DragDropManager {
    */
   handleDragEnd(e, waypoint) {
     try {
-      // Remove all drag-related classes
+      // Remove all drag-related classes with smooth transition
       waypoint.classList.remove(CONFIG.CLASSES.WAYPOINT_DRAGGING);
       waypoint.style.cursor = 'grab';
       
-      // Remove drag-over class from all waypoints
-      const allWaypoints = this.routeContainer.querySelectorAll('.waypoint-item');
-      allWaypoints.forEach(wp => wp.classList.remove(CONFIG.CLASSES.WAYPOINT_DRAG_OVER));
+      // Clear all drop targets
+      this.clearDropTargets();
       
       // Clean up state
       this.draggedElement = null;
       this.draggedIndex = -1;
       this.dropTarget = null;
       
-      // Re-initialize drag and drop after reordering
+      // Re-initialize drag and drop after animations complete
       setTimeout(() => {
         this.makeWaypointsDraggable();
-      }, CONFIG.UI.ANIMATION_DELAY);
+      }, 800); // Longer delay to let completion animations finish
       
     } catch (error) {
       console.error('Error in drag end:', error);
@@ -311,9 +333,17 @@ export class DragDropManager {
         case 'ArrowUp':
           e.preventDefault();
           if (e.ctrlKey && currentIndex > 0) {
-            // Move waypoint up
+            // Move waypoint up with animation
+            const waypointName = waypoint.dataset.waypointName;
             this.reorderWaypoints(currentIndex, currentIndex - 1);
-            this.announceToScreenReader(`Moved waypoint up to position ${currentIndex}`);
+            setTimeout(() => {
+              const movedElement = this.findMovedElement(waypointName, currentIndex - 1);
+              if (movedElement) {
+                this.showDropSuccess(movedElement);
+                setTimeout(() => this.showReorderComplete(movedElement), 100);
+              }
+            }, 50);
+            this.announceToScreenReader(`Successfully moved waypoint up to position ${currentIndex}`);
           } else if (currentIndex > 0) {
             // Focus previous waypoint
             waypoints[currentIndex - 1].focus();
@@ -323,9 +353,17 @@ export class DragDropManager {
         case 'ArrowDown':
           e.preventDefault();
           if (e.ctrlKey && currentIndex < waypoints.length - 1) {
-            // Move waypoint down
+            // Move waypoint down with animation
+            const waypointName = waypoint.dataset.waypointName;
             this.reorderWaypoints(currentIndex, currentIndex + 1);
-            this.announceToScreenReader(`Moved waypoint down to position ${currentIndex + 2}`);
+            setTimeout(() => {
+              const movedElement = this.findMovedElement(waypointName, currentIndex + 1);
+              if (movedElement) {
+                this.showDropSuccess(movedElement);
+                setTimeout(() => this.showReorderComplete(movedElement), 100);
+              }
+            }, 50);
+            this.announceToScreenReader(`Successfully moved waypoint down to position ${currentIndex + 2}`);
           } else if (currentIndex < waypoints.length - 1) {
             // Focus next waypoint
             waypoints[currentIndex + 1].focus();
@@ -335,9 +373,17 @@ export class DragDropManager {
         case 'Home':
           e.preventDefault();
           if (e.ctrlKey && currentIndex > 0) {
-            // Move to top
+            // Move to top with animation
+            const waypointName = waypoint.dataset.waypointName;
             this.reorderWaypoints(currentIndex, 0);
-            this.announceToScreenReader(`Moved waypoint to top`);
+            setTimeout(() => {
+              const movedElement = this.findMovedElement(waypointName, 0);
+              if (movedElement) {
+                this.showDropSuccess(movedElement);
+                setTimeout(() => this.showReorderComplete(movedElement), 100);
+              }
+            }, 50);
+            this.announceToScreenReader(`Successfully moved waypoint to top position`);
           } else {
             // Focus first waypoint
             waypoints[0]?.focus();
@@ -347,9 +393,17 @@ export class DragDropManager {
         case 'End':
           e.preventDefault();
           if (e.ctrlKey && currentIndex < waypoints.length - 1) {
-            // Move to bottom
+            // Move to bottom with animation
+            const waypointName = waypoint.dataset.waypointName;
             this.reorderWaypoints(currentIndex, waypoints.length - 1);
-            this.announceToScreenReader(`Moved waypoint to bottom`);
+            setTimeout(() => {
+              const movedElement = this.findMovedElement(waypointName, waypoints.length - 1);
+              if (movedElement) {
+                this.showDropSuccess(movedElement);
+                setTimeout(() => this.showReorderComplete(movedElement), 100);
+              }
+            }, 50);
+            this.announceToScreenReader(`Successfully moved waypoint to bottom position`);
           } else {
             // Focus last waypoint
             waypoints[waypoints.length - 1]?.focus();
@@ -446,7 +500,7 @@ export class DragDropManager {
   handleTouchEnd(e, waypoint) {
     try {
       if (this.isTouchDragging && this.dropTarget) {
-        // Perform drop
+        // Perform drop with animations
         const waypoints = Array.from(this.routeContainer.querySelectorAll('.waypoint-item'))
           .filter(wp => !wp.querySelector('#continue-ofp-btn'));
         
@@ -454,8 +508,31 @@ export class DragDropManager {
         const targetIndex = waypoints.indexOf(this.dropTarget);
         
         if (draggedIndex !== -1 && targetIndex !== -1) {
+          // Store waypoint name for finding after reorder
+          const waypointName = waypoint.dataset.waypointName;
+          
+          // Perform reorder first
           this.reorderWaypoints(draggedIndex, targetIndex);
+          
+          // Show success animation on moved element
+          setTimeout(() => {
+            const movedElement = this.findMovedElement(waypointName, targetIndex);
+            if (movedElement) {
+              this.showDropSuccess(movedElement);
+              
+              // Show completion animation
+              setTimeout(() => {
+                this.showReorderComplete(movedElement);
+              }, 100);
+            }
+          }, 50);
+          
+          // Announce success
+          this.announceToScreenReader(`Successfully moved waypoint to new position`);
         }
+      } else if (this.isTouchDragging) {
+        // Invalid drop
+        this.handleInvalidDrop();
       }
       
       // Clean up touch drag state
@@ -515,6 +592,140 @@ export class DragDropManager {
   }
 
   /**
+   * Clear all drop target visual indicators
+   * @private
+   */
+  clearDropTargets() {
+    const allWaypoints = this.routeContainer.querySelectorAll('.waypoint-item');
+    allWaypoints.forEach(wp => {
+      wp.classList.remove(CONFIG.CLASSES.WAYPOINT_DRAG_OVER);
+      wp.classList.remove(CONFIG.CLASSES.WAYPOINT_DROP_TARGET);
+      wp.classList.remove(CONFIG.CLASSES.WAYPOINT_DROP_SUCCESS);
+      wp.classList.remove(CONFIG.CLASSES.WAYPOINT_POSITION_CHANGE);
+      wp.classList.remove(CONFIG.CLASSES.WAYPOINT_REORDER_COMPLETE);
+      wp.classList.remove(CONFIG.CLASSES.WAYPOINT_DRAG_INVALID);
+    });
+  }
+
+  /**
+   * Find the moved element at its new position after reordering
+   * @private
+   * @param {string} waypointName - Name of the waypoint that was moved
+   * @param {number} targetIndex - Expected index position
+   * @returns {HTMLElement|null} The moved element or null if not found
+   */
+  findMovedElement(waypointName, targetIndex) {
+    try {
+      const waypoints = Array.from(this.routeContainer.querySelectorAll('.waypoint-item'))
+        .filter(wp => !wp.querySelector('#continue-ofp-btn'));
+      
+      // First try to find by waypoint name at the expected position
+      if (waypointName && waypoints[targetIndex] && waypoints[targetIndex].dataset.waypointName === waypointName) {
+        return waypoints[targetIndex];
+      }
+      
+      // Fallback: find by waypoint name anywhere in the list
+      if (waypointName) {
+        return waypoints.find(wp => wp.dataset.waypointName === waypointName) || null;
+      }
+      
+      // Last resort: return element at target index
+      return waypoints[targetIndex] || null;
+    } catch (error) {
+      console.error('Error finding moved element:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Show drop success animation - Simplified
+   * @private
+   * @param {HTMLElement} waypoint - Target waypoint
+   */
+  showDropSuccess(waypoint) {
+    try {
+      if (waypoint && waypoint.classList) {
+        waypoint.classList.remove(CONFIG.CLASSES.WAYPOINT_DROP_TARGET);
+        waypoint.classList.add(CONFIG.CLASSES.WAYPOINT_DROP_SUCCESS);
+        
+        // Remove after brief feedback
+        setTimeout(() => {
+          if (waypoint && waypoint.classList) {
+            waypoint.classList.remove(CONFIG.CLASSES.WAYPOINT_DROP_SUCCESS);
+          }
+        }, 300);
+      }
+    } catch (error) {
+      console.error('Error in showDropSuccess:', error);
+    }
+  }
+
+  /**
+   * Show reorder complete animation - Simplified
+   * @private
+   * @param {HTMLElement} waypoint - Target waypoint
+   */
+  showReorderComplete(waypoint) {
+    try {
+      if (waypoint && waypoint.classList) {
+        waypoint.classList.add(CONFIG.CLASSES.WAYPOINT_REORDER_COMPLETE);
+        
+        // Remove after brief feedback
+        setTimeout(() => {
+          if (waypoint && waypoint.classList) {
+            waypoint.classList.remove(CONFIG.CLASSES.WAYPOINT_REORDER_COMPLETE);
+          }
+        }, 400);
+      }
+    } catch (error) {
+      console.error('Error in showReorderComplete:', error);
+    }
+  }
+
+  /**
+   * Handle invalid drop attempt
+   * @private
+   */
+  handleInvalidDrop() {
+    if (this.draggedElement) {
+      this.draggedElement.classList.add(CONFIG.CLASSES.WAYPOINT_DRAG_INVALID);
+      
+      // Remove after animation
+      setTimeout(() => {
+        if (this.draggedElement) {
+          this.draggedElement.classList.remove(CONFIG.CLASSES.WAYPOINT_DRAG_INVALID);
+        }
+      }, 500);
+    }
+  }
+
+  /**
+   * Show position change animation for affected waypoints - Simplified
+   * @private
+   * @param {number} fromIndex - Source index
+   * @param {number} toIndex - Target index
+   */
+  showPositionChangeAnimation(fromIndex, toIndex) {
+    try {
+      const waypoints = Array.from(this.routeContainer.querySelectorAll('.waypoint-item'))
+        .filter(wp => !wp.querySelector('#continue-ofp-btn'));
+      
+      // Simple feedback for moved waypoint only
+      if (waypoints[toIndex] && waypoints[toIndex].classList) {
+        waypoints[toIndex].classList.add(CONFIG.CLASSES.WAYPOINT_POSITION_CHANGE);
+        
+        setTimeout(() => {
+          if (waypoints[toIndex] && waypoints[toIndex].classList) {
+            waypoints[toIndex].classList.remove(CONFIG.CLASSES.WAYPOINT_POSITION_CHANGE);
+          }
+        }, 200);
+      }
+    } catch (error) {
+      console.error('Error in showPositionChangeAnimation:', error);
+    }
+  }
+
+  /**
    * Reorder waypoints in the DOM and update waypoint manager
    * @private
    * @param {number} fromIndex - Source index
@@ -535,7 +746,12 @@ export class DragDropManager {
       const fromElement = waypoints[fromIndex];
       const toElement = waypoints[toIndex];
       
-      // Reorder DOM elements
+      // Show position change animation for affected waypoints
+      this.showPositionChangeAnimation(fromIndex, toIndex);
+      
+      // Reorder DOM elements with smooth animation
+      fromElement.classList.add(CONFIG.CLASSES.WAYPOINT_SMOOTH_INSERT);
+      
       if (fromIndex < toIndex) {
         // Moving down - insert after target
         toElement.parentNode.insertBefore(fromElement, toElement.nextSibling);
@@ -543,6 +759,11 @@ export class DragDropManager {
         // Moving up - insert before target
         toElement.parentNode.insertBefore(fromElement, toElement);
       }
+      
+      // Clean up smooth insert animation
+      setTimeout(() => {
+        fromElement.classList.remove(CONFIG.CLASSES.WAYPOINT_SMOOTH_INSERT);
+      }, 500);
       
       // Update waypoint manager's planned route
       if (this.waypointManager) {
@@ -556,6 +777,10 @@ export class DragDropManager {
           this.waypointManager.plannedRoute = plannedRoute;
           
           console.log(`Reordered waypoints: moved index ${fromIndex} to ${toIndex}`);
+          
+          // CRITICAL FIX: Update flight calculator and state management after reordering
+          // This ensures Route Legs are recalculated with the new order
+          this.updateFlightDataAfterReorder(plannedRoute);
         }
       }
       
@@ -565,6 +790,45 @@ export class DragDropManager {
     } catch (error) {
       console.error('Error reordering waypoints:', error);
       throw error;
+    }
+  }
+
+  /**
+   * Update flight data and state management after reordering waypoints
+   * @private
+   * @param {Array} newRoute - The reordered route array
+   */
+  updateFlightDataAfterReorder(newRoute) {
+    try {
+      console.log('🔄 Updating flight data after waypoint reorder');
+      
+      // Update state management with new route order
+      stateManager.setState('flightPlan.route', [...newRoute]);
+      console.log('📊 State updated with reordered route');
+      
+      // Get the flight calculator from the main app and update route data
+      if (typeof window !== 'undefined' && window.SystemRemasterApp) {
+        const flightCalculator = window.SystemRemasterApp.getModule('flightCalculator');
+        if (flightCalculator && typeof flightCalculator.updateRouteData === 'function') {
+          flightCalculator.updateRouteData(newRoute);
+          console.log('🧮 Flight calculator updated with reordered route');
+        }
+      }
+      
+      // Update waypoint counter to reflect any changes
+      if (this.waypointManager && typeof this.waypointManager.updateWaypointCounter === 'function') {
+        this.waypointManager.updateWaypointCounter();
+        console.log('📊 Waypoint counter updated after reorder');
+      }
+      
+      // Update critical point dropdown to match new route order
+      if (this.waypointManager && typeof this.waypointManager.updateCriticalPointDropdown === 'function') {
+        this.waypointManager.updateCriticalPointDropdown();
+        console.log('🎯 Critical point dropdown updated after reorder');
+      }
+      
+    } catch (error) {
+      console.error('Error updating flight data after reorder:', error);
     }
   }
 
