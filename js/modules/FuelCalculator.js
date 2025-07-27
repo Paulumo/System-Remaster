@@ -112,6 +112,256 @@ export class FuelCalculator {
   }
 
   /**
+   * Calculate fuel at critical point using direct formula
+   * Formula: Total Fuel - Taxi Fuel - (Cumulative Flight Time to Critical Point * 5kg/min)
+   * @param {Array} routeLegs - Array of route leg objects with flightTime
+   * @param {Object} fuelData - Total fuel breakdown
+   * @param {string} criticalWaypointName - Name of critical waypoint
+   * @returns {Object} Critical point fuel calculation result
+   */
+  calculateFuelAtCriticalPointDirect(routeLegs, fuelData, criticalWaypointName) {
+    try {
+      if (!Array.isArray(routeLegs) || routeLegs.length === 0) {
+        throw new Error('Valid route legs required');
+      }
+      
+      if (!criticalWaypointName || criticalWaypointName === 'Not identified') {
+        return {
+          found: false,
+          waypoint: criticalWaypointName || 'Not identified',
+          fuelAtCriticalPoint: 0,
+          cumulativeTimeToCP: 0,
+          error: 'No critical waypoint selected'
+        };
+      }
+
+      // Find the critical waypoint in the route
+      let criticalWaypointIndex = -1;
+      let cumulativeTimeToCP = 0;
+      
+      // Search for exact match or partial match
+      for (let i = 0; i < routeLegs.length; i++) {
+        const leg = routeLegs[i];
+        if (leg.to === criticalWaypointName || 
+            leg.to.includes(criticalWaypointName) ||
+            criticalWaypointName.includes(leg.to)) {
+          criticalWaypointIndex = i;
+          break;
+        }
+      }
+      
+      // If not found by name, look for wind turbine pattern
+      if (criticalWaypointIndex === -1) {
+        const turbinePattern = /[A-Z]+\d+[A-Z]\d+/; // Pattern like CH1A07
+        for (let i = 0; i < routeLegs.length; i++) {
+          const leg = routeLegs[i];
+          if (turbinePattern.test(leg.to)) {
+            criticalWaypointIndex = i;
+            criticalWaypointName = leg.to; // Update to actual waypoint name
+            break;
+          }
+        }
+      }
+      
+      if (criticalWaypointIndex === -1) {
+        return {
+          found: false,
+          waypoint: criticalWaypointName,
+          fuelAtCriticalPoint: 0,
+          cumulativeTimeToCP: 0,
+          error: 'Critical waypoint not found in route'
+        };
+      }
+      
+      // Calculate cumulative flight time to critical point
+      for (let i = 0; i <= criticalWaypointIndex; i++) {
+        cumulativeTimeToCP += routeLegs[i].flightTime;
+      }
+      
+      // Apply the direct formula: Total Fuel - Taxi Fuel - (Cumulative Time * 5kg/min)
+      const fuelAtCriticalPoint = fuelData.totalFuel - 
+                                  fuelData.breakdown.taxiFuel - 
+                                  (cumulativeTimeToCP * this.FUEL_CONSUMPTION_RATE);
+      
+      return {
+        found: true,
+        waypoint: criticalWaypointName,
+        fuelAtCriticalPoint: Math.round(fuelAtCriticalPoint),
+        cumulativeTimeToCP: cumulativeTimeToCP,
+        waypointIndex: criticalWaypointIndex,
+        calculationMethod: 'Direct formula',
+        formula: `${fuelData.totalFuel} - ${fuelData.breakdown.taxiFuel} - (${cumulativeTimeToCP} * ${this.FUEL_CONSUMPTION_RATE})`,
+        calculatedAt: new Date().toISOString()
+      };
+      
+    } catch (error) {
+      console.error('Error calculating fuel at critical point (direct):', error);
+      return {
+        found: false,
+        waypoint: criticalWaypointName || 'Unknown',
+        fuelAtCriticalPoint: 0,
+        cumulativeTimeToCP: 0,
+        error: error.message
+      };
+    }
+  }
+
+  /**
+   * Calculate fuel remaining at each waypoint along the route with hoisting support
+   * @param {Array} routeLegs - Array of route leg objects with flightTime
+   * @param {Object} fuelData - Total fuel breakdown
+   * @param {string} criticalWaypointName - Name of critical waypoint for hoisting calculations
+   * @param {number} hoistingTime - Hoisting time in minutes (default: 0)
+   * @returns {Array} Array of waypoint fuel data with hoisting breakdown
+   */
+  calculateWaypointFuelRemainingWithHoisting(routeLegs, fuelData, criticalWaypointName = '', hoistingTime = 0) {
+    try {
+      if (!Array.isArray(routeLegs) || routeLegs.length === 0) {
+        throw new Error('Valid route legs required');
+      }
+
+      const waypointFuelData = [];
+      
+      // Find critical waypoint index
+      let criticalWaypointIndex = -1;
+      if (criticalWaypointName) {
+        for (let i = 0; i < routeLegs.length; i++) {
+          const leg = routeLegs[i];
+          if (leg.to === criticalWaypointName || 
+              leg.to.includes(criticalWaypointName) ||
+              criticalWaypointName.includes(leg.to)) {
+            criticalWaypointIndex = i;
+            break;
+          }
+        }
+        
+        // If not found by name, look for wind turbine pattern
+        if (criticalWaypointIndex === -1) {
+          const turbinePattern = /[A-Z]+\d+[A-Z]\d+/; // Pattern like CH1A07
+          for (let i = 0; i < routeLegs.length; i++) {
+            const leg = routeLegs[i];
+            if (turbinePattern.test(leg.to)) {
+              criticalWaypointIndex = i;
+              criticalWaypointName = leg.to; // Update to actual waypoint name
+              break;
+            }
+          }
+        }
+      }
+      
+      // Starting fuel after taxi
+      let currentFuel = fuelData.totalFuel - fuelData.breakdown.taxiFuel;
+      
+      // Add departure point (after taxi)
+      waypointFuelData.push({
+        waypoint: routeLegs[0].from,
+        fuelRemaining: currentFuel,
+        fuelBurned: fuelData.breakdown.taxiFuel,
+        cumulativeTime: 0,
+        notes: 'Departure (after taxi fuel burn)'
+      });
+
+      let cumulativeTime = 0;
+
+      // Calculate fuel remaining at each destination waypoint
+      routeLegs.forEach((leg, index) => {
+        const fuelBurned = leg.flightTime * this.FUEL_CONSUMPTION_RATE;
+        currentFuel -= fuelBurned;
+        cumulativeTime += leg.flightTime;
+        
+        let notes = 'En route';
+        let fuelRemainingDisplay = Math.round(currentFuel);
+        
+        // Check if this is the critical waypoint
+        if (index === criticalWaypointIndex && hoistingTime > 0) {
+          const hoistingFuelBurn = hoistingTime * this.FUEL_CONSUMPTION_RATE;
+          const fuelAfterHoisting = currentFuel - hoistingFuelBurn;
+          
+          // Add waypoint arrival entry (before hoisting)
+          waypointFuelData.push({
+            waypoint: leg.to,
+            fuelRemaining: Math.round(currentFuel),
+            fuelBurned: Math.round(fuelBurned),
+            cumulativeTime: cumulativeTime,
+            legDistance: leg.distance || 0,
+            legTime: leg.flightTime,
+            notes: 'Critical Point (arrival - before hoisting)',
+            isCriticalPoint: true,
+            hoistingPhase: 'arrival'
+          });
+          
+          // Add hoisting operation entry
+          waypointFuelData.push({
+            waypoint: `${leg.to} (Hoisting)`,
+            fuelRemaining: Math.round(fuelAfterHoisting),
+            fuelBurned: Math.round(hoistingFuelBurn),
+            cumulativeTime: cumulativeTime + hoistingTime,
+            legDistance: 0,
+            legTime: hoistingTime,
+            notes: `Hoisting operation (${hoistingTime} min burn)`,
+            isCriticalPoint: true,
+            hoistingPhase: 'operation'
+          });
+          
+          // Update current fuel for subsequent legs
+          currentFuel = fuelAfterHoisting;
+          cumulativeTime += hoistingTime;
+          return; // Skip the normal waypoint entry since we added custom entries
+        }
+        
+        // Determine final waypoint notes
+        if (index === routeLegs.length - 1) {
+          notes = 'Arrival (before final reserve)';
+        }
+        
+        waypointFuelData.push({
+          waypoint: leg.to,
+          fuelRemaining: fuelRemainingDisplay,
+          fuelBurned: Math.round(fuelBurned),
+          cumulativeTime: cumulativeTime,
+          legDistance: leg.distance || 0,
+          legTime: leg.flightTime,
+          notes: notes,
+          isCriticalPoint: index === criticalWaypointIndex && hoistingTime === 0
+        });
+      });
+
+      return {
+        waypointData: waypointFuelData,
+        summary: {
+          totalFuelOnBoard: fuelData.totalFuel,
+          startingFuelAfterTaxi: fuelData.totalFuel - fuelData.breakdown.taxiFuel,
+          finalFuelRemaining: waypointFuelData[waypointFuelData.length - 1].fuelRemaining,
+          totalFuelBurned: waypointFuelData.reduce((sum, wp) => sum + wp.fuelBurned, 0),
+          finalReserveAvailable: fuelData.breakdown.finalReserveFuel,
+          criticalPointData: criticalWaypointIndex >= 0 ? {
+            waypoint: criticalWaypointName,
+            index: criticalWaypointIndex,
+            hoistingTime: hoistingTime,
+            hoistingFuelBurn: hoistingTime * this.FUEL_CONSUMPTION_RATE
+          } : null
+        },
+        calculatedAt: new Date().toISOString()
+      };
+      
+    } catch (error) {
+      console.error('Error calculating waypoint fuel remaining with hoisting:', error);
+      return {
+        waypointData: [],
+        summary: {
+          totalFuelOnBoard: 0,
+          startingFuelAfterTaxi: 0,
+          finalFuelRemaining: 0,
+          totalFuelBurned: 0,
+          finalReserveAvailable: this.FINAL_RESERVE_FUEL,
+          criticalPointData: null
+        },
+        error: error.message
+      };
+    }
+  }
+
+  /**
    * Calculate fuel remaining at each waypoint along the route
    * @param {Array} routeLegs - Array of route leg objects with flightTime
    * @param {Object} fuelData - Total fuel breakdown
@@ -125,18 +375,16 @@ export class FuelCalculator {
 
       const waypointFuelData = [];
       
-      // Starting fuel after taxi (subtract taxi fuel as it's already burned)
-      let currentFuel = fuelData.breakdown.tripFuel + 
-                       fuelData.breakdown.finalReserveFuel + 
-                       fuelData.breakdown.contingencyFuel;
+      // Starting fuel after taxi (correct calculation: total fuel minus taxi already burned)
+      let currentFuel = fuelData.totalFuel - fuelData.breakdown.taxiFuel;
       
       // Add departure point (after taxi)
       waypointFuelData.push({
         waypoint: routeLegs[0].from,
         fuelRemaining: currentFuel,
-        fuelBurned: 0,
+        fuelBurned: fuelData.breakdown.taxiFuel, // Show taxi fuel as burned
         cumulativeTime: 0,
-        notes: 'After taxi fuel burn'
+        notes: 'Departure (after taxi fuel burn)'
       });
 
       let cumulativeTime = 0;
@@ -161,9 +409,8 @@ export class FuelCalculator {
       return {
         waypointData: waypointFuelData,
         summary: {
-          startingFuel: fuelData.breakdown.tripFuel + 
-                       fuelData.breakdown.finalReserveFuel + 
-                       fuelData.breakdown.contingencyFuel,
+          totalFuelOnBoard: fuelData.totalFuel,
+          startingFuelAfterTaxi: fuelData.totalFuel - fuelData.breakdown.taxiFuel,
           finalFuelRemaining: waypointFuelData[waypointFuelData.length - 1].fuelRemaining,
           totalFuelBurned: waypointFuelData.reduce((sum, wp) => sum + wp.fuelBurned, 0),
           finalReserveAvailable: fuelData.breakdown.finalReserveFuel
@@ -176,7 +423,8 @@ export class FuelCalculator {
       return {
         waypointData: [],
         summary: {
-          startingFuel: 0,
+          totalFuelOnBoard: 0,
+          startingFuelAfterTaxi: 0,
           finalFuelRemaining: 0,
           totalFuelBurned: 0,
           finalReserveAvailable: this.FINAL_RESERVE_FUEL
@@ -188,67 +436,144 @@ export class FuelCalculator {
 
   /**
    * Find critical point (hoisting site) and calculate fuel remaining there
-   * @param {Array} waypointFuelData - Waypoint fuel data array
+   * Uses the direct calculation method for more accurate fuel at critical point
+   * Includes hoisting fuel burn calculation
+   * @param {Array} routeLegs - Array of route leg objects 
+   * @param {Object} fuelData - Total fuel breakdown
    * @param {string} criticalWaypointName - Name of critical waypoint (e.g., "CH1A07")
-   * @returns {Object} Critical point fuel analysis
+   * @param {Array} waypointFuelData - Optional: waypoint fuel data for fallback
+   * @param {number} hoistingTime - Hoisting time in minutes (default: 0)
+   * @returns {Object} Critical point fuel analysis with hoisting calculations
    */
-  findCriticalPointFuel(waypointFuelData, criticalWaypointName) {
+  findCriticalPointFuel(routeLegs, fuelData, criticalWaypointName, waypointFuelData = null, hoistingTime = 0) {
     try {
-      if (!Array.isArray(waypointFuelData) || !criticalWaypointName) {
-        throw new Error('Valid waypoint data and critical waypoint name required');
+      // Primary method: Use direct calculation
+      const directResult = this.calculateFuelAtCriticalPointDirect(routeLegs, fuelData, criticalWaypointName);
+      
+      if (directResult.found) {
+        // Calculate hoisting fuel burn
+        const hoistingFuelBurn = hoistingTime * this.FUEL_CONSUMPTION_RATE;
+        const fuelAfterHoisting = directResult.fuelAtCriticalPoint - hoistingFuelBurn;
+        
+        return {
+          found: true,
+          waypoint: directResult.waypoint,
+          fuelAtCriticalPoint: directResult.fuelAtCriticalPoint,
+          timeAtCriticalPoint: directResult.cumulativeTimeToCP,
+          calculationMethod: 'Direct formula with hoisting',
+          // Enhanced hoisting calculations
+          hoisting: {
+            hoistingTime: hoistingTime,
+            hoistingFuelBurn: Math.round(hoistingFuelBurn),
+            fuelAfterHoisting: Math.round(fuelAfterHoisting),
+            fuelStatus: fuelAfterHoisting > 0 ? 'Adequate' : 'Critical'
+          },
+          analysis: {
+            isTurbineWaypoint: /[A-Z]+\d+[A-Z]\d+/.test(directResult.waypoint),
+            autoDetected: directResult.waypoint !== criticalWaypointName,
+            fuelStatus: directResult.fuelAtCriticalPoint > 0 ? 'Adequate' : 'Critical',
+            remainingFlightTime: this.calculateRemainingFlightCapability(directResult.fuelAtCriticalPoint),
+            formula: directResult.formula,
+            // Enhanced analysis with hoisting
+            fuelAfterHoistingStatus: fuelAfterHoisting > 0 ? 'Adequate' : 'Critical',
+            remainingFlightTimeAfterHoisting: this.calculateRemainingFlightCapability(fuelAfterHoisting),
+            hoistingCalculation: `${directResult.fuelAtCriticalPoint} kg - (${hoistingTime} min × ${this.FUEL_CONSUMPTION_RATE} kg/min) = ${Math.round(fuelAfterHoisting)} kg`
+          },
+          directCalculation: directResult
+        };
       }
-
-      const criticalPoint = waypointFuelData.find(wp => 
-        wp.waypoint === criticalWaypointName || 
-        wp.waypoint.includes(criticalWaypointName)
-      );
-
-      if (!criticalPoint) {
-        // If exact match not found, try to find wind turbine waypoint (contains numbers and letters)
-        const turbinePattern = /[A-Z]+\d+[A-Z]\d+/; // Pattern like CH1A07
-        const turbineWaypoint = waypointFuelData.find(wp => 
-          turbinePattern.test(wp.waypoint)
+      
+      // Fallback method: Use waypoint fuel data if provided
+      if (waypointFuelData && Array.isArray(waypointFuelData)) {
+        const criticalPoint = waypointFuelData.find(wp => 
+          wp.waypoint === criticalWaypointName || 
+          wp.waypoint.includes(criticalWaypointName)
         );
 
-        if (turbineWaypoint) {
-          console.log(`Critical waypoint ${criticalWaypointName} not found, using ${turbineWaypoint.waypoint}`);
+        if (!criticalPoint) {
+          // If exact match not found, try to find wind turbine waypoint
+          const turbinePattern = /[A-Z]+\d+[A-Z]\d+/; // Pattern like CH1A07
+          const turbineWaypoint = waypointFuelData.find(wp => 
+            turbinePattern.test(wp.waypoint)
+          );
+
+          if (turbineWaypoint) {
+            console.log(`Critical waypoint ${criticalWaypointName} not found, using ${turbineWaypoint.waypoint}`);
+            
+            // Calculate hoisting fuel burn for fallback method
+            const hoistingFuelBurn = hoistingTime * this.FUEL_CONSUMPTION_RATE;
+            const fuelAfterHoisting = turbineWaypoint.fuelRemaining - hoistingFuelBurn;
+            
+            return {
+              found: true,
+              waypoint: turbineWaypoint.waypoint,
+              fuelAtCriticalPoint: turbineWaypoint.fuelRemaining,
+              timeAtCriticalPoint: turbineWaypoint.cumulativeTime,
+              calculationMethod: 'Waypoint interpolation (fallback) with hoisting',
+              // Enhanced hoisting calculations
+              hoisting: {
+                hoistingTime: hoistingTime,
+                hoistingFuelBurn: Math.round(hoistingFuelBurn),
+                fuelAfterHoisting: Math.round(fuelAfterHoisting),
+                fuelStatus: fuelAfterHoisting > 0 ? 'Adequate' : 'Critical'
+              },
+              analysis: {
+                isTurbineWaypoint: true,
+                autoDetected: true,
+                fuelStatus: turbineWaypoint.fuelRemaining > 0 ? 'Adequate' : 'Critical',
+                remainingFlightTime: this.calculateRemainingFlightCapability(turbineWaypoint.fuelRemaining),
+                // Enhanced analysis with hoisting
+                fuelAfterHoistingStatus: fuelAfterHoisting > 0 ? 'Adequate' : 'Critical',
+                remainingFlightTimeAfterHoisting: this.calculateRemainingFlightCapability(fuelAfterHoisting),
+                hoistingCalculation: `${turbineWaypoint.fuelRemaining} kg - (${hoistingTime} min × ${this.FUEL_CONSUMPTION_RATE} kg/min) = ${Math.round(fuelAfterHoisting)} kg`
+              }
+            };
+          }
+        } else {
+          // Calculate hoisting fuel burn for exact match
+          const hoistingFuelBurn = hoistingTime * this.FUEL_CONSUMPTION_RATE;
+          const fuelAfterHoisting = criticalPoint.fuelRemaining - hoistingFuelBurn;
+          
           return {
             found: true,
-            waypoint: turbineWaypoint.waypoint,
-            fuelAtCriticalPoint: turbineWaypoint.fuelRemaining,
-            timeAtCriticalPoint: turbineWaypoint.cumulativeTime,
+            waypoint: criticalPoint.waypoint,
+            fuelAtCriticalPoint: criticalPoint.fuelRemaining,
+            timeAtCriticalPoint: criticalPoint.cumulativeTime,
+            calculationMethod: 'Waypoint interpolation (fallback) with hoisting',
+            // Enhanced hoisting calculations
+            hoisting: {
+              hoistingTime: hoistingTime,
+              hoistingFuelBurn: Math.round(hoistingFuelBurn),
+              fuelAfterHoisting: Math.round(fuelAfterHoisting),
+              fuelStatus: fuelAfterHoisting > 0 ? 'Adequate' : 'Critical'
+            },
             analysis: {
-              isTurbineWaypoint: true,
-              autoDetected: true,
-              fuelStatus: turbineWaypoint.fuelRemaining > 0 ? 'Adequate' : 'Critical'
+              isTurbineWaypoint: /[A-Z]+\d+[A-Z]\d+/.test(criticalPoint.waypoint),
+              autoDetected: false,
+              fuelStatus: criticalPoint.fuelRemaining > 0 ? 'Adequate' : 'Critical',
+              remainingFlightTime: this.calculateRemainingFlightCapability(criticalPoint.fuelRemaining),
+              // Enhanced analysis with hoisting
+              fuelAfterHoistingStatus: fuelAfterHoisting > 0 ? 'Adequate' : 'Critical',
+              remainingFlightTimeAfterHoisting: this.calculateRemainingFlightCapability(fuelAfterHoisting),
+              hoistingCalculation: `${criticalPoint.fuelRemaining} kg - (${hoistingTime} min × ${this.FUEL_CONSUMPTION_RATE} kg/min) = ${Math.round(fuelAfterHoisting)} kg`
             }
           };
         }
-
-        return {
-          found: false,
-          waypoint: criticalWaypointName,
-          fuelAtCriticalPoint: 0,
-          timeAtCriticalPoint: 0,
-          analysis: {
-            isTurbineWaypoint: false,
-            autoDetected: false,
-            fuelStatus: 'Unknown - waypoint not found'
-          }
-        };
       }
 
+      // No critical point found
       return {
-        found: true,
-        waypoint: criticalPoint.waypoint,
-        fuelAtCriticalPoint: criticalPoint.fuelRemaining,
-        timeAtCriticalPoint: criticalPoint.cumulativeTime,
+        found: false,
+        waypoint: criticalWaypointName || 'Unknown',
+        fuelAtCriticalPoint: 0,
+        timeAtCriticalPoint: 0,
+        calculationMethod: 'Not found',
         analysis: {
-          isTurbineWaypoint: /[A-Z]+\d+[A-Z]\d+/.test(criticalPoint.waypoint),
+          isTurbineWaypoint: false,
           autoDetected: false,
-          fuelStatus: criticalPoint.fuelRemaining > 0 ? 'Adequate' : 'Critical',
-          remainingFlightTime: this.calculateRemainingFlightCapability(criticalPoint.fuelRemaining)
-        }
+          fuelStatus: 'Unknown - waypoint not found in route'
+        },
+        error: directResult.error || 'Critical waypoint not found'
       };
       
     } catch (error) {
@@ -258,6 +583,7 @@ export class FuelCalculator {
         waypoint: criticalWaypointName || 'Unknown',
         fuelAtCriticalPoint: 0,
         timeAtCriticalPoint: 0,
+        calculationMethod: 'Error',
         analysis: {
           isTurbineWaypoint: false,
           autoDetected: false,
@@ -330,7 +656,7 @@ export class FuelCalculator {
    */
   generateFuelSummary(fuelCalculation, criticalPointData) {
     try {
-      return {
+      const summary = {
         totalFuelRequired: fuelCalculation.totalFuel,
         minimumFuelRequired: fuelCalculation.minimumRequiredFuel,
         fuelBreakdown: fuelCalculation.breakdown,
@@ -348,6 +674,24 @@ export class FuelCalculator {
         recommendations: this.generateRecommendations(fuelCalculation, criticalPointData),
         generatedAt: new Date().toISOString()
       };
+
+      // Add hoisting information if available
+      if (criticalPointData.hoisting) {
+        summary.hoisting = {
+          hoistingTime: criticalPointData.hoisting.hoistingTime,
+          hoistingFuelBurn: criticalPointData.hoisting.hoistingFuelBurn,
+          fuelAfterHoisting: criticalPointData.hoisting.fuelAfterHoisting,
+          fuelStatus: criticalPointData.hoisting.fuelStatus,
+          flightTimeRemainingAfterHoisting: this.calculateRemainingFlightCapability(criticalPointData.hoisting.fuelAfterHoisting),
+          calculation: criticalPointData.analysis.hoistingCalculation
+        };
+        
+        // Update critical point to show both before and after hoisting
+        summary.criticalPoint.fuelAfterHoisting = criticalPointData.hoisting.fuelAfterHoisting;
+        summary.criticalPoint.fuelAfterHoistingStatus = criticalPointData.hoisting.fuelStatus;
+      }
+
+      return summary;
       
     } catch (error) {
       console.error('Error generating fuel summary:', error);
@@ -369,9 +713,32 @@ export class FuelCalculator {
     const recommendations = [];
 
     try {
-      // Check critical point fuel
+      // Check critical point fuel (before hoisting)
       if (criticalPointData.fuelAtCriticalPoint < 100) {
         recommendations.push('⚠️ Low fuel at critical point - consider reducing payload or adding discretion fuel');
+      }
+
+      // Enhanced hoisting-specific recommendations
+      if (criticalPointData.hoisting) {
+        const hoisting = criticalPointData.hoisting;
+        
+        // Check fuel after hoisting
+        if (hoisting.fuelAfterHoisting < 50) {
+          recommendations.push('🚨 CRITICAL: Very low fuel after hoisting operation - immediate review required');
+        } else if (hoisting.fuelAfterHoisting < 100) {
+          recommendations.push('⚠️ Low fuel after hoisting - consider reducing hoisting time or adding discretion fuel');
+        }
+        
+        // Check hoisting time reasonableness
+        if (hoisting.hoistingTime > 30) {
+          recommendations.push('💡 Extended hoisting time detected - verify operational requirements');
+        }
+        
+        // Check if hoisting fuel burn exceeds 10% of critical point fuel
+        const hoistingBurnPercentage = (hoisting.hoistingFuelBurn / criticalPointData.fuelAtCriticalPoint) * 100;
+        if (hoistingBurnPercentage > 15) {
+          recommendations.push('⚠️ Hoisting operation consumes significant fuel - consider operational efficiency');
+        }
       }
 
       // Check discretion fuel

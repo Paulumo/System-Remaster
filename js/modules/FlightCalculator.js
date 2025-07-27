@@ -26,7 +26,7 @@ export class FlightCalculator {
       },
       weather: {
         windSpeed: 0,
-        windDirection: 0,
+        windDirection: 360,
         temperature: 25,
         windBenefits: 75
       },
@@ -449,19 +449,33 @@ export class FlightCalculator {
         total: fuelCalculation.totalFuel
       };
       
-      // Calculate fuel remaining at each waypoint
+      // Calculate fuel remaining at each waypoint with hoisting support
       if (route.legs.length > 0) {
-        const waypointFuelResult = this.fuelCalculator.calculateWaypointFuelRemaining(route.legs, fuelCalculation);
+        const criticalWaypoint = this.getCriticalPointFromUI() || this.findCriticalWaypoint();
+        
+        // Use simple waypoint fuel calculation (without hoisting annotations)
+        const waypointFuelResult = this.fuelCalculator.calculateWaypointFuelRemaining(
+          route.legs, 
+          fuelCalculation
+        );
         this.flightData.route.waypointFuelData = waypointFuelResult.waypointData;
         
-        // Find critical point fuel (look for wind turbine waypoint)
+        // Find critical point fuel with hoisting calculations
         const criticalPointResult = this.fuelCalculator.findCriticalPointFuel(
+          route.legs,
+          fuelCalculation,
+          criticalWaypoint,
           waypointFuelResult.waypointData,
-          this.findCriticalWaypoint()
+          hoistingTime
         );
         
         this.flightData.performance.fuelAtCriticalPoint = criticalPointResult.fuelAtCriticalPoint;
         this.flightData.performance.criticalPointAnalysis = criticalPointResult;
+        
+        console.log(`💡 Critical Point Analysis: ${criticalPointResult.waypoint}, Fuel: ${criticalPointResult.fuelAtCriticalPoint}kg, Hoisting: ${hoistingTime}min`);
+        if (criticalPointResult.hoisting) {
+          console.log(`💡 Hoisting: ${criticalPointResult.hoisting.hoistingFuelBurn}kg burn, ${criticalPointResult.hoisting.fuelAfterHoisting}kg remaining after hoisting`);
+        }
       }
       
       console.log(`Fuel calculated: Trip ${breakdown.tripFuel}kg, Total ${fuelCalculation.totalFuel}kg`);
@@ -764,7 +778,9 @@ export class FlightCalculator {
         waypointFuel: data.route.waypointFuelData.map(wp => ({
           waypoint: wp.waypoint,
           fuelRemaining: `${wp.fuelRemaining} kg`,
-          time: `${wp.cumulativeTime} min`
+          time: `${wp.cumulativeTime} min`,
+          notes: wp.notes || '',
+          hoistingPhase: wp.hoistingPhase || null
         }))
       },
       performance: {
@@ -785,6 +801,15 @@ export class FlightCalculator {
         fuelConsumptionRate: `${this.fuelCalculator.getFuelConsumptionRate()} kg/min`,
         trueAirspeed: `${this.navigationCalculator.getTrueAirspeed()} kts`,
         pressureAltitude: `${this.performanceCalculator.getAircraftSpecs().pressureAltitude} ft`
+      },
+      hoisting: {
+        hoistingTime: `${hoistingTime} min`,
+        hoistingFuelBurn: `${hoistingTime * this.fuelCalculator.getFuelConsumptionRate()} kg`,
+        criticalPointAnalysis: data.performance.criticalPointAnalysis?.hoisting ? {
+          fuelBeforeHoisting: `${data.performance.criticalPointAnalysis.fuelAtCriticalPoint} kg`,
+          fuelAfterHoisting: `${data.performance.criticalPointAnalysis.hoisting.fuelAfterHoisting} kg`,
+          hoistingStatus: data.performance.criticalPointAnalysis.hoisting.fuelStatus
+        } : null
       }
     };
   }
@@ -801,7 +826,7 @@ export class FlightCalculator {
       },
       weather: {
         windSpeed: 0,
-        windDirection: 0,
+        windDirection: 360,
         temperature: 25,
         windBenefits: 75
       },

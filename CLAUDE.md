@@ -43,11 +43,11 @@ The system generates **Operational Flight Plans (OFP)** with detailed flight cal
 
 **1. Navigation Calculations**:
 - Great circle distance and bearing between waypoints
-- Magnetic variation for Taiwan region (-5.01°)
+- Magnetic variation for Taiwan region (-4.6°)
 - Wind correction using provided formulas:
-  - Wind Correction Angle: `x = DEGREES(ASIN(Wind Speed/True Air Speed)*SIN(Wind Direction*PI()/180-Magnetic Course Degree*PI()/180))`
-  - Ground Speed: `y = IF(Magnetic Course = Wind Direction, TAS - Wind Speed, (Wind Speed*SIN(Wind Dir*PI()/180-Mag Course*PI()/180-x*PI()/180))/SIN(x*PI()/180))`
-- Flight time calculation: `ROUNDUP((Nautical Miles/y*60),0)` minutes
+  - Wind Correction Angle: `Wind Correction Angle = DEGREES(ASIN(Wind Speed/True Air Speed)*SIN(Wind Direction*PI()/180-Magnetic Course Degree*PI()/180))`
+  - Ground Speed: `Ground Speed = IF(Magnetic Course = Wind Direction, TAS - Wind Speed, (Wind Speed*SIN(Wind Direction*PI()/180-Mag Course*PI()/180- Wind Correction Angle *PI()/180))/SIN( Wind Correction Angle *PI()/180))`
+- Flight time calculation: `ROUNDUP((Nautical Miles/Ground Speed*60),0)` minutes
 
 **2. Fuel Calculations**:
 - **Fixed Components**: Taxi (60kg), Final Reserve (150kg/30min), Extras (80kg)
@@ -55,6 +55,7 @@ The system generates **Operational Flight Plans (OFP)** with detailed flight cal
 - **Variable**: Discretion fuel (pilot decision)
 - **Total Fuel** = Taxi + Trip + Final Reserve + Contingency + Extras + Discretion
 - **Fuel remaining at each waypoint** with critical point analysis
+- **Fuel remaining at Critical Point** : Total fuel - Taxi Fuel - Enroute fuel to Critical Point
 
 **3. Performance Calculations**:
 - **DOM (Dry Operating Mass)** = Aircraft Empty Weight (3427kg) + PIC + SIC + HOP weights

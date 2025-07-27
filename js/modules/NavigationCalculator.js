@@ -175,13 +175,13 @@ export class NavigationCalculator {
 
       // Check if wind direction equals magnetic course (direct headwind/tailwind)
       const courseDifference = Math.abs(windDirection - magneticCourse);
-      if (courseDifference < 0.1 || courseDifference > 359.9) {
+      if (courseDifference < 0.1 || courseDifference > 179.9) {
         // Direct headwind or tailwind
         if (courseDifference < 0.1) {
-          // Headwind (wind direction = course direction)
+          // Headwind (wind direction = course direction, wind coming from ahead)
           return Math.max(trueAirSpeed - windSpeed, 1); // Minimum 1 knot
         } else {
-          // Tailwind (wind direction opposite to course)
+          // Tailwind (wind direction opposite to course, wind from behind)
           return trueAirSpeed + windSpeed;
         }
       }
@@ -196,11 +196,12 @@ export class NavigationCalculator {
         return trueAirSpeed; // Use TAS if correction angle is near zero
       }
 
-      // Calculate ground speed using the provided formula
+      // Calculate ground speed using the formula from CLAUDE.md - wind triangle calculation only
+      // User specified: use only the wind triangle result, not TAS + wind triangle result
       const numerator = windSpeed * Math.sin(windDirRad - courseDirRad - correctionRad);
       const denominator = Math.sin(correctionRad);
       
-      const groundSpeed = trueAirSpeed - (numerator / denominator);
+      const groundSpeed = numerator / denominator;
       
       // Ensure ground speed is positive and reasonable
       return Math.max(Math.round(groundSpeed * 10) / 10, 1);

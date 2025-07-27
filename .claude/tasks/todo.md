@@ -13,3 +13,6 @@ for this version:
 1. change the mag variation to -4.6
 2. critical point + fuel remaining
 3. 
+
+-----
+wind direction wind speed not updating flight time

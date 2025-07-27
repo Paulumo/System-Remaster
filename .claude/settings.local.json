@@ -8,7 +8,9 @@
       "Bash(ls:*)",
       "Bash(dir \"C:\\Users\\Pablo.MONT\\.claude\\hooks\")",
       "Bash(python3:*)",
-      "Bash(cp:*)"
+      "Bash(cp:*)",
+      "Bash(rm:*)",
+      "Bash(python:*)"
     ],
     "deny": []
   },

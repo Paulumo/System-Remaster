@@ -287,6 +287,9 @@ export class UIManager {
         calculationPanel.setAttribute('aria-hidden', 'false');
         this.currentPanel = 'calculation';
         
+        // Initialize weather inputs with default values if they're empty
+        this.initializeWeatherInputs();
+        
         // Always perform calculations when showing calculation panel to ensure current data
         console.log('🔄 Updating calculation display on panel switch');
         this.performCalculations();
@@ -422,6 +425,41 @@ export class UIManager {
   }
 
   /**
+   * Initialize weather inputs with default values if empty
+   * @private
+   */
+  initializeWeatherInputs() {
+    try {
+      const windSpeedInput = domCache.get('#wind-speed');
+      const windDirectionInput = domCache.get('#wind-direction');
+      const temperatureInput = domCache.get('#temperature');
+      const windBenefitsInput = domCache.get('#wind-benefits');
+      
+      // Set default values if inputs are empty or have no value
+      if (windSpeedInput && (!windSpeedInput.value || windSpeedInput.value === '')) {
+        windSpeedInput.value = '0';
+      }
+      
+      if (windDirectionInput && (!windDirectionInput.value || windDirectionInput.value === '')) {
+        windDirectionInput.value = '360';
+      }
+      
+      if (temperatureInput && (!temperatureInput.value || temperatureInput.value === '')) {
+        temperatureInput.value = '25';
+      }
+      
+      if (windBenefitsInput && (!windBenefitsInput.value || windBenefitsInput.value === '')) {
+        windBenefitsInput.value = '75';
+      }
+      
+      console.log('🌤️ Weather inputs initialized with default values');
+      
+    } catch (error) {
+      console.error('Error initializing weather inputs:', error);
+    }
+  }
+
+  /**
    * Setup calculation panel functionality
    * @private
    */
@@ -463,6 +501,9 @@ export class UIManager {
         // Update any display elements immediately if needed
         if (this.currentPanel === 'calculation') {
           this.performCalculations();
+          
+          // Update any open OFP summary modal
+          this.updateOpenOFPSummary();
         }
       });
       this.eventCleanupFunctions.push(cleanup4);
@@ -471,6 +512,9 @@ export class UIManager {
       const cleanup5 = addEventListenerWithCleanup(hoistingTimeInput, 'blur', () => {
         if (this.currentPanel === 'calculation') {
           this.performCalculations();
+          
+          // Update any open OFP summary modal
+          this.updateOpenOFPSummary();
         }
       });
       this.eventCleanupFunctions.push(cleanup5);
@@ -488,15 +532,23 @@ export class UIManager {
       }
     });
     
-    // Weather inputs
+    // Weather inputs with enhanced wind change handling
     const weatherInputs = ['#wind-speed', '#wind-direction', '#temperature', '#wind-benefits'];
     weatherInputs.forEach(selector => {
       const input = domCache.get(selector);
       if (input) {
         const cleanup = addEventListenerWithCleanup(input, 'input', () => {
+          console.log(`🌪️ Weather input changed: ${selector}, triggering immediate recalculation`);
           this.updateWeatherData();
         });
         this.eventCleanupFunctions.push(cleanup);
+        
+        // Also trigger on blur to ensure calculation happens when user leaves field
+        const blurCleanup = addEventListenerWithCleanup(input, 'blur', () => {
+          console.log(`🌪️ Weather input blur: ${selector}, ensuring calculations are up to date`);
+          this.updateWeatherData();
+        });
+        this.eventCleanupFunctions.push(blurCleanup);
       }
     });
   }
@@ -608,8 +660,18 @@ export class UIManager {
       
       if (payloadValue) {
         payloadValue.textContent = `${performance.payloadAvailable} kg`;
-        // Add hover tooltip with calculation breakdown
-        payloadValue.title = `Available Payload = HOGE (${performance.hoge}kg) - Fuel at Critical Point (${performance.fuelAtCriticalPoint}kg) - DOM (${performance.dom}kg)`;
+        
+        // Enhanced tooltip with hoisting information
+        let tooltipText = `Available Payload = HOGE (${performance.hoge}kg) - Fuel at Critical Point (${performance.fuelAtCriticalPoint}kg) - DOM (${performance.dom}kg)`;
+        
+        // Add hoisting information if available
+        const criticalPointAnalysis = performance.criticalPointAnalysis;
+        if (criticalPointAnalysis && criticalPointAnalysis.hoisting) {
+          const hoisting = criticalPointAnalysis.hoisting;
+          tooltipText += `\n\nHoisting Details:\n- Fuel before hoisting: ${performance.fuelAtCriticalPoint}kg\n- Hoisting time: ${hoisting.hoistingTime}min\n- Hoisting fuel burn: ${hoisting.hoistingFuelBurn}kg\n- Fuel after hoisting: ${hoisting.fuelAfterHoisting}kg`;
+        }
+        
+        payloadValue.title = tooltipText;
       }
       
       // Update status indicator and message based on comprehensive analysis
@@ -643,6 +705,9 @@ export class UIManager {
         clearFieldError(discretionInput);
         // Trigger recalculation
         this.performCalculations();
+        
+        // Update any open OFP summary modal
+        this.updateOpenOFPSummary();
       }
     } catch (error) {
       console.error('Error updating discretion fuel:', error);
@@ -678,6 +743,9 @@ export class UIManager {
           clearFieldError(input);
           // Trigger recalculation
           this.performCalculations();
+          
+          // Update any open OFP summary modal
+          this.updateOpenOFPSummary();
         }
       }
     } catch (error) {
@@ -697,6 +765,8 @@ export class UIManager {
       const windDirection = parseFloat(domCache.get('#wind-direction')?.value) || 0;
       const temperature = parseFloat(domCache.get('#temperature')?.value) || 25;
       const windBenefits = parseFloat(domCache.get('#wind-benefits')?.value) || 75;
+      
+      console.log(`🌪️ Wind data updated: ${windSpeed}kts @ ${windDirection}°, triggering recalculation`);
       
       const result = this.flightCalculator.updateWeatherData({
         windSpeed,
@@ -721,11 +791,46 @@ export class UIManager {
           if (input) clearFieldError(input);
         });
         
-        // Trigger recalculation
+        // Trigger comprehensive recalculation that will update all UI areas
+        console.log(`🔄 Triggering full flight calculations after wind change: ${windSpeed}kts @ ${windDirection}°`);
         this.performCalculations();
+        
+        // Update any open OFP summary modal with new calculations
+        this.updateOpenOFPSummary();
+        
+        console.log('✅ Wind-triggered calculations complete, UI should be updated');
       }
     } catch (error) {
       console.error('Error updating weather data:', error);
+    }
+  }
+
+  /**
+   * Update any open OFP summary modal with new calculations
+   * @private
+   */
+  updateOpenOFPSummary() {
+    try {
+      // Check if OFP summary modal is currently open (look for specific OFP modal content)
+      const ofpModal = document.querySelector('.fixed.inset-0.bg-black.bg-opacity-50');
+      const ofpContent = ofpModal?.querySelector('h2');
+      
+      if (!ofpModal || !ofpContent || !ofpContent.textContent.includes('Operational Flight Plan')) {
+        return; // No OFP modal open
+      }
+      
+      console.log('🔄 Updating open OFP summary with new calculations');
+      
+      // Close existing modal and regenerate with updated data
+      document.body.removeChild(ofpModal);
+      
+      // Generate fresh OFP with updated calculations
+      setTimeout(() => {
+        this.generateOFP();
+      }, 100); // Small delay to ensure calculations are complete
+      
+    } catch (error) {
+      console.error('Error updating open OFP summary:', error);
     }
   }
 
@@ -746,19 +851,19 @@ export class UIManager {
     let dotClass = 'w-2 h-2 bg-[#16a34a] rounded-full animate-pulse';
     
     // Check for critical conditions
-    if (performance.payloadAvailable < 100) {
+    if (performance.payloadAvailable < 200) {
       status = 'critical';
-      message = 'Critical: Very low payload capacity';
+      message = 'Critical: Very low payload';
       dotClass = 'w-2 h-2 bg-[#ef4444] rounded-full animate-pulse';
-    } else if (performance.payloadAvailable < 300) {
+    } else if (performance.payloadAvailable < 450) {
       status = 'warning';
-      message = 'Warning: Limited payload capacity';
-      dotClass = 'w-2 h-2 bg-[#f59e0b] rounded-full animate-pulse';
-    } else if (performance.fuelAtCriticalPoint < 100) {
-      status = 'warning';
-      message = 'Warning: Low fuel at critical point';
-      dotClass = 'w-2 h-2 bg-[#f59e0b] rounded-full animate-pulse';
-    }
+      message = 'Caution: Limited payload';
+      dotClass = 'w-2 h-2 bg-[#ffc000] rounded-full animate-pulse';
+    } else if (performance.payloadAvailable >= 450) {
+      status = 'good';
+      message = 'Status: Good payload';
+      dotClass = 'w-2 h-2 bg-[#10b981] rounded-full animate-pulse';
+    } 
     
     statusDot.className = dotClass;
     statusText.textContent = message;
@@ -774,14 +879,35 @@ export class UIManager {
     try {
       // Add route analysis information if route data exists
       if (fuelResult.waypointFuelData && fuelResult.waypointFuelData.length > 0) {
-        console.log('🗺️ Route Analysis:');
+        console.log('🗺️ Route Analysis with Hoisting:');
         fuelResult.waypointFuelData.forEach(wp => {
-          console.log(`  ${wp.waypoint}: ${wp.fuelRemaining}kg fuel, ${wp.cumulativeTime}min`);
+          if (wp.isCriticalPoint && wp.hoistingPhase) {
+            if (wp.hoistingPhase === 'arrival') {
+              console.log(`  ➤ ${wp.waypoint}: ${wp.fuelRemaining}kg fuel (before hoisting), ${wp.cumulativeTime}min`);
+            } else if (wp.hoistingPhase === 'operation') {
+              console.log(`  ⬇️ ${wp.waypoint}: ${wp.fuelRemaining}kg fuel (after hoisting), ${wp.cumulativeTime}min`);
+              console.log(`     Hoisting burn: ${wp.fuelBurned}kg over ${wp.legTime}min`);
+            }
+          } else {
+            console.log(`  ${wp.waypoint}: ${wp.fuelRemaining}kg fuel, ${wp.cumulativeTime}min`);
+          }
         });
       }
       
-      // Add critical point analysis
-      if (fuelResult.criticalPointFuel) {
+      // Enhanced critical point analysis with hoisting
+      const criticalPointAnalysis = performanceResult.performance.criticalPointAnalysis;
+      if (criticalPointAnalysis && criticalPointAnalysis.found) {
+        console.log(`🔴 Critical Point Analysis: ${criticalPointAnalysis.waypoint}`);
+        console.log(`  Fuel at arrival: ${criticalPointAnalysis.fuelAtCriticalPoint}kg`);
+        
+        if (criticalPointAnalysis.hoisting) {
+          const hoisting = criticalPointAnalysis.hoisting;
+          console.log(`  Hoisting time: ${hoisting.hoistingTime}min`);
+          console.log(`  Hoisting fuel burn: ${hoisting.hoistingFuelBurn}kg`);
+          console.log(`  Fuel after hoisting: ${hoisting.fuelAfterHoisting}kg (${hoisting.fuelStatus})`);
+          console.log(`  Calculation: ${criticalPointAnalysis.analysis.hoistingCalculation}`);
+        }
+      } else if (fuelResult.criticalPointFuel) {
         console.log(`🔴 Critical Point Fuel: ${fuelResult.criticalPointFuel}kg`);
       }
       

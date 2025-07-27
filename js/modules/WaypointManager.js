@@ -36,6 +36,7 @@ export class WaypointManager {
       this.updateWaypointCounter();
       this.setupStateSubscriptions();
       this.setupPresetRoutes();
+      this.setupCriticalPointDropdownListener();
       
       // No default route - let user choose GCH or TRN manually
       console.log('WaypointManager initialized successfully - no default route loaded');
@@ -1044,22 +1045,33 @@ export class WaypointManager {
       console.log(`🎯 Updating critical point dropdown with ${this.plannedRoute.length} waypoints`);
       console.log(`📋 Current route order: ${this.plannedRoute.map((wp, i) => `${i+1}.${wp.name}`).join(' → ')}`);
       
+      // Store current selected value to preserve selection
+      const currentValue = dropdown.value;
+      
       // Clear existing options except the first one
       dropdown.innerHTML = '<option value="">Select...</option>';
       
       // CRITICAL FIX: Populate with current route waypoints using unique routeId
       // This ensures each route instance has a unique dropdown option
+      
       this.plannedRoute.forEach((waypoint, index) => {
         const optionValue = waypoint.routeId || waypoint.id; // Use unique route ID
+        let displayText = `${index + 1}. ${waypoint.name}`;
+        
+        // Note: Removed hoisting annotation from dropdown for cleaner UI
+        
         const option = createElement('option', {
           value: optionValue
-        }, `${index + 1}. ${waypoint.name}`);
+        }, displayText);
         dropdown.appendChild(option);
-        console.log(`  Added option: ${index + 1}. ${waypoint.name} [${optionValue}]`);
+        console.log(`  Added option: ${displayText} [${optionValue}]`);
       });
       
-      // Set default to middle waypoint if route has waypoints
-      if (this.plannedRoute.length >= 3) {
+      // Restore previously selected value if it still exists, otherwise set default
+      if (currentValue && Array.from(dropdown.options).some(option => option.value === currentValue)) {
+        dropdown.value = currentValue;
+        console.log(`  Restored selection to: ${dropdown.selectedOptions[0]?.textContent} [${currentValue}]`);
+      } else if (this.plannedRoute.length >= 3) {
         const middleIndex = Math.floor(this.plannedRoute.length / 2);
         const middleWaypoint = this.plannedRoute[middleIndex];
         const defaultValue = middleWaypoint.routeId || middleWaypoint.id;
@@ -1082,6 +1094,9 @@ export class WaypointManager {
     try {
       console.log(`🎯 Direct update critical point dropdown with ${this.plannedRoute.length} waypoints`);
       
+      // Store current selected value to preserve selection
+      const currentValue = dropdown.value;
+      
       // Clear existing options except the first one
       dropdown.innerHTML = '<option value="">Select...</option>';
       
@@ -1090,13 +1105,21 @@ export class WaypointManager {
         const option = document.createElement('option');
         const optionValue = waypoint.routeId || waypoint.id; // Use unique route ID
         option.value = optionValue;
-        option.textContent = `${index + 1}. ${waypoint.name}`;
+        
+        let displayText = `${index + 1}. ${waypoint.name}`;
+        
+        // Note: Removed hoisting annotation from dropdown for cleaner UI
+        
+        option.textContent = displayText;
         dropdown.appendChild(option);
-        console.log(`  Added option: ${index + 1}. ${waypoint.name} [${optionValue}]`);
+        console.log(`  Added option: ${displayText} [${optionValue}]`);
       });
       
-      // Set default to middle waypoint if route has waypoints
-      if (this.plannedRoute.length >= 3) {
+      // Restore previously selected value if it still exists, otherwise set default
+      if (currentValue && Array.from(dropdown.options).some(option => option.value === currentValue)) {
+        dropdown.value = currentValue;
+        console.log(`  Restored selection to: ${dropdown.selectedOptions[0]?.textContent} [${currentValue}]`);
+      } else if (this.plannedRoute.length >= 3) {
         const middleIndex = Math.floor(this.plannedRoute.length / 2);
         const middleWaypoint = this.plannedRoute[middleIndex];
         const defaultValue = middleWaypoint.routeId || middleWaypoint.id;
@@ -1108,6 +1131,27 @@ export class WaypointManager {
     } catch (error) {
       console.error('Error in direct critical point dropdown update:', error);
     }
+  }
+
+  /**
+   * Setup critical point dropdown event listener to update display when selection changes
+   * @private
+   */
+  setupCriticalPointDropdownListener() {
+    const dropdown = domCache.get('#critical-point') || document.getElementById('critical-point');
+    if (!dropdown) {
+      console.warn('⚠️ Critical point dropdown not found, cannot setup listener');
+      return;
+    }
+
+    const cleanup = addEventListenerWithCleanup(dropdown, 'change', () => {
+      console.log('🎯 Critical point dropdown changed, updating display');
+      // Update the dropdown with the newly selected item
+      this.updateCriticalPointDropdown();
+    });
+    
+    this.eventCleanupFunctions.push(cleanup);
+    console.log('✅ Critical point dropdown listener setup complete');
   }
 
   /**

@@ -178,6 +178,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Performance calculations
     const hogeValue = document.getElementById('hoge-value');
     const payloadValue = document.getElementById('payload-value');
+
     
     // Mock calculation - replace with actual logic later
     const totalCrewWeight = (parseInt(document.getElementById('pic-weight').value) || 75) +
