@@ -2,7 +2,7 @@ import math
 
 def calculate_flight_time():
     # Constants
-    magnetic_variation = -4.6  # degrees
+    magnetic_variation = 0 # degrees
     true_air_speed = 120  # example TAS in knots (you can change or let user input)
 
     # # User input
@@ -13,10 +13,10 @@ def calculate_flight_time():
 
 
      # User input
-    wind_dir = float(200)
-    wind_speed = float(20)
-    mag_course = float(225.3)
-    distance_nm = float(22.6)
+    wind_dir = float(180)
+    wind_speed = float(90)
+    mag_course = float(86)
+    distance_nm = float(37.2)
 
     # Convert magnetic course to true course
     true_course = mag_course - magnetic_variation
@@ -28,6 +28,10 @@ def calculate_flight_time():
     # Wind Correction Angle (in degrees)
     try:
         wca_rad = math.asin((wind_speed / true_air_speed) * math.sin(wind_dir_rad - true_course_rad))
+        print(round(math.asin((wind_speed / true_air_speed)), 9))
+        print(round(math.sin(wind_dir_rad - true_course_rad), 9))
+        print(round(math.degrees(wca_rad), 9))
+
     except ValueError:
         print("Invalid input: wind speed too high relative to TAS.")
         return
@@ -52,9 +56,12 @@ def calculate_flight_time():
 
     # Output
     print(f"\n✅ Results:")
+    print(f"WCA: {wca_deg:.2f}°")
+    print(f"Ground Speed : {ground_speed:.2f} knots")
+    # print(f"True Air Speed: {true_air_speed:.2f} knots")
     print(f"True Course: {true_course:.2f}°")
-    print(f"Wind Correction Angle: {wca_deg:.2f}°")
-    print(f"Ground Speed: {ground_speed:.2f} knots")
+    # print(f"Wind Correction Angle: {wca_deg:.2f}°")
+    # print(f"Ground Speed: {ground_speed:.2f} knots")
     print(f"Estimated Flight Time: {flight_time} minutes")
 
 # Run the calculator

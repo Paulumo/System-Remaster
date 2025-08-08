@@ -13,29 +13,5 @@
       "Bash(python:*)"
     ],
     "deny": []
-  },
-  "hooks": {
-    "PostToolUse": [
-      {
-        "matcher": "Write|Edit|MultiEdit",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python3 \"C:\\Users\\Pablo.MONT\\OneDrive - Heliservice\\Docs\\py\\System Remaster\\.claude\\hooks\\hook_handler.py\""
-          }
-        ]
-      }
-    ],
-    "Stop": [
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python3 \"C:\\Users\\Pablo.MONT\\OneDrive - Heliservice\\Docs\\py\\System Remaster\\.claude\\hooks\\hook_handler.py\""
-          }
-        ]
-      }
-    ]
   }
 }

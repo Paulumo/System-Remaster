@@ -177,10 +177,8 @@ export class FlightCalculator {
       // Update weather data with validated values
       Object.entries(validation).forEach(([field, result]) => {
         if (result.isValid && result.value !== null) {
-          const weatherField = field.replace(/([A-Z])/g, (match, letter) => 
-            letter.toLowerCase()
-          );
-          this.flightData.weather[weatherField] = result.value;
+          // Field names from validation match flightData.weather keys (windSpeed, windDirection, temperature, windBenefits)
+          this.flightData.weather[field] = result.value;
         }
       });
       

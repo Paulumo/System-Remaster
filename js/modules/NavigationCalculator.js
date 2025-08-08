@@ -10,7 +10,7 @@
 export class NavigationCalculator {
   constructor() {
     // Taiwan region magnetic variation (degrees)
-    this.MAGNETIC_VARIATION = -5.01;
+    this.MAGNETIC_VARIATION = +4.7;
     
     // Earth radius in nautical miles
     this.EARTH_RADIUS_NM = 3443.89849;
@@ -168,42 +168,20 @@ export class NavigationCalculator {
    */
   calculateGroundSpeed(windSpeed, windDirection, magneticCourse, windCorrectionAngle, trueAirSpeed = this.TRUE_AIRSPEED) {
     try {
-      // Handle zero wind case
+      // Zero-wind case
       if (windSpeed === 0) {
         return trueAirSpeed;
       }
 
-      // Check if wind direction equals magnetic course (direct headwind/tailwind)
-      const courseDifference = Math.abs(windDirection - magneticCourse);
-      if (courseDifference < 0.1 || courseDifference > 179.9) {
-        // Direct headwind or tailwind
-        if (courseDifference < 0.1) {
-          // Headwind (wind direction = course direction, wind coming from ahead)
-          return Math.max(trueAirSpeed - windSpeed, 1); // Minimum 1 knot
-        } else {
-          // Tailwind (wind direction opposite to course, wind from behind)
-          return trueAirSpeed + windSpeed;
-        }
-      }
+      // Standard wind triangle along-track ground speed
+      // beta = angle between wind-from direction and course (degrees)
+      const betaRad = (windDirection - magneticCourse) * this.DEG_TO_RAD;
+      const wcaRad = windCorrectionAngle * this.DEG_TO_RAD;
 
-      // Convert to radians
-      const windDirRad = windDirection * this.DEG_TO_RAD;
-      const courseDirRad = magneticCourse * this.DEG_TO_RAD;
-      const correctionRad = windCorrectionAngle * this.DEG_TO_RAD;
+      // GS = TAS * cos(WCA) - W * cos(beta)
+      const groundSpeed = (trueAirSpeed * Math.cos(wcaRad)) - (windSpeed * Math.cos(betaRad));
 
-      // Avoid division by zero
-      if (Math.abs(Math.sin(correctionRad)) < 0.001) {
-        return trueAirSpeed; // Use TAS if correction angle is near zero
-      }
-
-      // Calculate ground speed using the formula from CLAUDE.md - wind triangle calculation only
-      // User specified: use only the wind triangle result, not TAS + wind triangle result
-      const numerator = windSpeed * Math.sin(windDirRad - courseDirRad - correctionRad);
-      const denominator = Math.sin(correctionRad);
-      
-      const groundSpeed = numerator / denominator;
-      
-      // Ensure ground speed is positive and reasonable
+      // Ensure GS is at least 1 kt and rounded to 0.1
       return Math.max(Math.round(groundSpeed * 10) / 10, 1);
       
     } catch (error) {

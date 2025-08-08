@@ -1,0 +1,29 @@
+{
+  "name": "system-remaster",
+  "version": "1.0.0",
+  "main": "analyze.js",
+  "directories": {
+    "doc": "docs",
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Paulumo/System-Remaster.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Paulumo/System-Remaster/issues"
+  },
+  "homepage": "https://github.com/Paulumo/System-Remaster#readme",
+  "description": "",
+  "dependencies": {
+    "@babel/parser": "^7.28.0",
+    "@babel/traverse": "^7.28.0",
+    "globby": "^14.1.0"
+  }
+}

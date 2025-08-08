@@ -10,7 +10,7 @@ for this version:
 
 -----
 
-1. change the mag variation to -4.6
+1. change the mag variation to +4.7
 2. critical point + fuel remaining
 3. 
 

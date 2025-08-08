@@ -6,13 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 This is the **System Remaster of HST** - a comprehensive helicopter flight planning and operations management system specifically designed for **AW169 helicopter operations** conducting **wind turbine maintenance flights** in Taiwan airspace.
 
-The system generates **Operational Flight Plans (OFP)** with detailed flight calculations including navigation, fuel planning, weight & balance, flight time and payload management for helicopter crews.
-
-## Pre-loaded data
-
-- User will have an kml file that contains waypoint(name, position and description) below "./src/Waypoint List Rev4.kml"
-- **Flight Points** : Flights points are some waypoints that are predefined location when flying, usually operational flights will have multiple flight points between departure and arrival
-- **Wind Turbines** : If the name of the points in kml file has the regex /[A-Z]+\d+[A-Z]+\d+/ , it will be one of the wind turbines. Wind turbines usually will be the center point of our operation trip.
+The system generates **Operational Flight Plans (OFP)** with detailed flight calculations including navigation, fuel planning, weight & balance, and payload management for helicopter crews.
 
 ## Mission Profile
 
@@ -20,84 +14,8 @@ The system generates **Operational Flight Plans (OFP)** with detailed flight cal
 - **Typical Route**: RCMQ (departure) → Dadu (transit) → (wind turbine/critical point) → Dadu (return transit) → RCMQ (arrival)
 - **Aircraft Type**: AW169 helicopter
 - **Crew Configuration**: PIC (Pilot in Command), SIC (Second in Command), HOP (Hoist Operator)
-- **Payload**: usually 3 Task Specialists (wind turbine technicians) + equipment/cargo bags
-- **Critical Point**: Usually the wind turbine hoisting site (e.g., CH1A07), or training site (e.g. Libao)
-
-
-
-## OFP generation - Data will be input by user
-
-First Session:
-- **Planned Route** : User will need to choose a planned route, the choices are the waypoints from loaded kml file, all the Wind Turbines and Flight Points. 
-- **Date & Time** : Date and Time for the Planned Flight
-- **Crew Infomation** : Name of the crews(PIC, SIC, HOP)
-- **Related Infomation** : Name of Dispatcher and Customer
-- **Flight Method** : VFR (Visual FLight Rules), OS VFR (Offshore VFR), IFR(Instrument Flight Rules)
-- **Helicopter Callsign** : Helicopter Callsign of that flight
-Second Session:
-- **Flight Crew Weight** : Weight of PIC, SIC and HOP 
-Third Session:
-- **Weather Data** : Wind Speed (kts), Wind Direction (°), Temperature (°C), Wind Benefits(75% or 100%)
-Fourth Session:
-- **Critical Point** : A list of waypoints from planned route that user selected, they will need to select one of the point as the critical point (usually the hoisting site/ training site; usually the middle waypoint will be the critical point: 3rd waypoint if there are 5 waypoints in route, 4th waypoint if 7 waypoints); a critical point is not mandatory required, might be a Flight Plan without a hoisting site
-- **Hoisting Time** : User will set a period of time for hoisting time, if there is a hoisting point for the planned route. Usually 10 mins
-Fifth Session:
-- **Fuel Calculation**: user will be required to decide the amount of Discretion fuel, all other fuels will be calculated by route and flight method.
-
-
-
-### Key Flight Calculations Required
-
-**1. Navigation Calculations**:
-- Great circle distance and bearing between waypoints
-- Magnetic variation for Taiwan region (+4.7W°)
-- Wind correction using provided formulas:
-  - Wind Correction Angle: `Wind Correction Angle = DEGREES(ASIN(Wind Speed/True Air Speed)*SIN(Wind Direction*PI()/180-Magnetic Course Degree*PI()/180))`
-  - Ground Speed: `Ground Speed = IF(Magnetic Course = Wind Direction, TAS - Wind Speed, (Wind Speed*SIN(Wind Direction*PI()/180-Mag Course*PI()/180- Wind Correction Angle *PI()/180))/SIN( Wind Correction Angle *PI()/180))`
-- Flight time calculation: `ROUNDUP((Nautical Miles/Ground Speed*60),0)` minutes
-- **Trip Time will definetly affect by wind speed and wind direction**
-
-
-**2. Fuel Calculations**:
-- **Fixed Components**: Taxi (60kg), Final Reserve (150kg/30min), Extras (80kg)
-- **Calculated Components**: Trip fuel (flight_time_minutes * 5kg/min), Contingency (10% of trip fuel)
-- **Variable**: Discretion fuel (pilot decision)
-- **Total Fuel** = Taxi + Trip + Final Reserve + Contingency + Extras + Discretion
-- **Fuel remaining at each waypoint** with critical point analysis
-- **Fuel remaining at Critical Point** : Total fuel - Taxi Fuel - Enroute fuel to Critical Point
-
-**3. Performance Calculations**:
-- **DOM (Dry Operating Mass)** = Aircraft Empty Weight (3427kg) + PIC + SIC + HOP weights
-- **HOGE (Hover Out of Ground Effect)** = RFM-based calculation (placeholder: temperature/altitude adjustments)
-- **Available Payload** = HOGE - Fuel at Critical Point - DOM
-- **Task Specialist Loading**: 3 specialists + cargo bags validation against available payload
-
-**4. Critical Point Analysis**:
-- Automatic detection of wind turbine waypoints (pattern: CH1A07, F1B02, etc.)
-- Fuel remaining calculation at critical point
-- Performance validation at critical point conditions
-
-
-### Data Sources
-
-**Waypoints**: 
-- `src/Waypoint List Rev4.kml` - KML file containing Taiwan flight waypoints
-- Categories: "Wind Turbines" (CH1*, F1*, etc.) and "Flight Point" (RCMQ, Dadu, etc.)
-
-**Aircraft Specifications** (AW169):
-- Empty Weight: 3427 kg
-- Default Crew Weights: PIC/SIC/HOP: 75-85 kg each
-- Fuel Consumption: 5 kg/min
-- True Airspeed: 120 kts
-- Base HOGE: ~4200-4800 kg (conditions dependent)
-
-### Styling & UI
-- **TailwindCSS** with custom CSS variables for dark theme
-- **Color Scheme**: Dark background (#15181e) with blue accents (#2563eb)
-- **Fonts**: Space Grotesk (primary), Noto Sans (fallback)
-- **Responsive Design**: Desktop-first for flight planning workflows
-- **Accessibility**: ARIA labels, keyboard navigation, screen reader support
-
+- **Payload**: 3 Task Specialists (wind turbine technicians) + equipment/cargo bags
+- **Critical Point**: Usually the wind turbine hoisting site (e.g., CH1A07)
 
 ## Architecture
 
@@ -121,7 +39,47 @@ Fifth Session:
   - **`js/modules/DragDropManager.js`**: Waypoint reordering functionality
   - **`js/modules/StateManager.js`**: Centralized state management with persistence
 
+### Key Flight Calculations Required
 
+**1. Navigation Calculations**:
+- Great circle distance and bearing between waypoints
+- Magnetic variation for Taiwan region (+4.7°)
+- Wind correction using provided formulas:
+  - Wind Correction Angle: `Wind Correction Angle = DEGREES(ASIN(Wind Speed/True Air Speed)*SIN(Wind Direction*PI()/180-Magnetic Course Degree*PI()/180))`
+  - Ground Speed: `Ground Speed = IF(Magnetic Course = Wind Direction, TAS - Wind Speed, (Wind Speed*SIN(Wind Direction*PI()/180-Mag Course*PI()/180- Wind Correction Angle *PI()/180))/SIN( Wind Correction Angle *PI()/180))`
+- Flight time calculation: `ROUNDUP((Nautical Miles/Ground Speed*60),0)` minutes
+
+**2. Fuel Calculations**:
+- **Fixed Components**: Taxi (60kg), Final Reserve (150kg/30min), Extras (80kg)
+- **Calculated Components**: Trip fuel (flight_time_minutes * 5kg/min), Contingency (10% of trip fuel)
+- **Variable**: Discretion fuel (pilot decision)
+- **Total Fuel** = Taxi + Trip + Final Reserve + Contingency + Extras + Discretion
+- **Fuel remaining at each waypoint** with critical point analysis
+- **Fuel remaining at Critical Point** : Total fuel - Taxi Fuel - Enroute fuel to Critical Point
+
+**3. Performance Calculations**:
+- **DOM (Dry Operating Mass)** = Aircraft Empty Weight (3427kg) + PIC + SIC + HOP weights
+- **HOGE (Hover Out of Ground Effect)** = RFM-based calculation (placeholder: temperature/altitude adjustments)
+- **Available Payload** = HOGE - Fuel at Critical Point - DOM
+- **Task Specialist Loading**: 3 specialists + cargo bags validation against available payload
+
+**4. Critical Point Analysis**:
+- Automatic detection of wind turbine waypoints (pattern: CH1A07, F1B02, etc.)
+- Fuel remaining calculation at critical point
+- Performance validation at critical point conditions
+
+### Data Sources
+
+**Waypoints**: 
+- `src/Waypoint List Rev4.kml` - KML file containing Taiwan flight waypoints
+- Categories: "Wind Turbines" (CH1*, F1*, etc.) and "Flight Point" (RCMQ, Dadu, etc.)
+
+**Aircraft Specifications** (AW169):
+- Empty Weight: 3427 kg
+- Default Crew Weights: PIC/SIC/HOP: 75-85 kg each
+- Fuel Consumption: 5 kg/min
+- True Airspeed: 120 kts
+- Base HOGE: ~4200-4800 kg (conditions dependent)
 
 ### Styling & UI
 - **TailwindCSS** with custom CSS variables for dark theme
@@ -148,6 +106,10 @@ Fifth Session:
     └── Waypoint List Rev4.kml # Taiwan waypoint data
 ```
 
+### Development Commands
+- **Local Development**: `python -m http.server` or `npx serve`
+- **No Build System**: Pure ES6 modules with static files
+- **Browser Requirements**: Modern browsers with ES6 module support
 
 ## Implementation Priorities
 
@@ -174,7 +136,7 @@ Fifth Session:
 - **Wind Correction**: Must use exact formulas provided for AW169 operations
 - **Fuel Planning**: 5kg/min consumption rate with all regulatory reserves
 - **Weight & Balance**: Precise DOM and payload calculations for safety
-- **Taiwan Operations**: Magnetic variation +4.7W°, RCMQ-based operations
+- **Taiwan Operations**: Magnetic variation +4.7°, RCMQ-based operations
 - **Real-time Calculations**: All values update dynamically as inputs change
 - **Professional UI**: Match quality and precision of actual flight planning tools
 

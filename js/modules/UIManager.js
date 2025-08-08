@@ -642,11 +642,38 @@ export class UIManager {
       const contingencyFuel = domCache.get('#contingency-fuel');
       const totalFuel = domCache.get('#total-fuel');
       
-      if (tripDuration) tripDuration.textContent = `${fuelResult.tripTime} min`;
+      // Use total flight time (route + hoisting) from fuel calculation for trip duration display
+      const totalFlightTime = fuelResult.tripTime  || 0; // This is route time + hoisting time
+      
+      if (tripDuration) {
+        tripDuration.textContent = `${totalFlightTime} min`;
+        console.log(`🔄 Trip duration UI updated via domCache: ${totalFlightTime} min`);
+      } else {
+        // Fallback: direct DOM selection if domCache fails
+        const tripDurationElement = document.getElementById('trip-duration');
+        if (tripDurationElement) {
+          tripDurationElement.textContent = `${totalFlightTime} min`;
+          console.log(`🔄 Trip duration UI updated via direct selection: ${totalFlightTime} min`);
+        } else {
+          console.error('❌ Trip duration element not found in DOM');
+        }
+      }
+      
+      // Force visual update by briefly highlighting the element
+      const tripElement = tripDuration || document.getElementById('trip-duration');
+      if (tripElement) {
+        tripElement.style.transition = 'background-color 0.3s';
+        tripElement.style.backgroundColor = '#2563eb20';
+        setTimeout(() => {
+          tripElement.style.backgroundColor = '';
+        }, 300);
+      }
       if (tripFuel) tripFuel.textContent = `${fuel.trip} kg`;
       if (contingencyDuration) contingencyDuration.textContent = `${Math.round(fuelResult.tripTime * 0.1)} min`;
       if (contingencyFuel) contingencyFuel.textContent = `${fuel.contingency} kg`;
       if (totalFuel) totalFuel.textContent = `${fuel.total} kg`;
+      
+      console.log(`🕐 Trip duration updated in UI: Total flight time ${totalFlightTime} min (includes route + hoisting time)`);
       
       // Update performance displays with new comprehensive data
       const hogeValue = domCache.get('#hoge-value');
@@ -791,7 +818,7 @@ export class UIManager {
           if (input) clearFieldError(input);
         });
         
-        // Trigger comprehensive recalculation that will update all UI areas
+        // Trigger recalculation and ensure modules refresh immediately
         console.log(`🔄 Triggering full flight calculations after wind change: ${windSpeed}kts @ ${windDirection}°`);
         this.performCalculations();
         
@@ -1033,24 +1060,32 @@ export class UIManager {
       className: 'space-y-4 text-white'
     });
     
-    // Add comprehensive summary sections
+    // Get current route flight time from FlightCalculator (updated with wind corrections)
+    const currentRouteData = this.flightCalculator?.getRouteData();
+    const currentFlightTime = currentRouteData?.totalFlightTime || 0;
+    const hoistingTime = this.flightCalculator?.getHoistingTime() || 0;
+    const totalFlightTimeWithHoisting = currentFlightTime + hoistingTime;
+    
+    // Add comprehensive summary sections with updated flight time
     this.addOFPSection(body, 'Flight Information', {
-      'Route': `${summary.route.waypointCount} waypoints, ${summary.route.totalDistance}, ${summary.route.totalFlightTime}`,
+      'Route': `${summary.route.waypointCount} waypoints, ${summary.route.totalDistance}, ${totalFlightTimeWithHoisting} min`,
+      'Flight Time Breakdown': `Route: ${currentFlightTime} min + Hoisting: ${hoistingTime} min`,
       'Critical Point': summary.route.criticalPoint || 'Not identified'
     });
     
-    // Route Legs Section
-    if (summary.route.legs && summary.route.legs.length > 0) {
+    // Route Legs Section with current flight times (wind-corrected)
+    const currentRouteLegs = currentRouteData?.legs || summary.route.legs;
+    if (currentRouteLegs && currentRouteLegs.length > 0) {
       const routeSection = createElement('div', {
         className: 'bg-[#20242d] rounded-lg p-4'
       });
       
       const routeTitle = createElement('h3', {
         className: 'text-[#2563eb] font-semibold mb-2'
-      }, 'Route Legs');
+      }, 'Route Legs (Wind Corrected)');
       routeSection.appendChild(routeTitle);
       
-      summary.route.legs.forEach((leg, index) => {
+      currentRouteLegs.forEach((leg, index) => {
         const legDiv = createElement('div', {
           className: 'flex justify-between py-1 text-sm border-b border-[#2c333f] last:border-b-0'
         });
@@ -1059,9 +1094,15 @@ export class UIManager {
           className: 'text-[#a0a9bb]'
         }, `${leg.from} → ${leg.to}`);
         
+        // Use current leg data with wind corrections
+        const distance = leg.distance ? `${leg.distance} NM` : (summary.route.legs[index]?.distance || '--');
+        const course = leg.magneticCourse ? `${leg.magneticCourse}°M` : (summary.route.legs[index]?.course || '--');
+        const time = leg.flightTime ? `${leg.flightTime} min` : (summary.route.legs[index]?.time || '--');
+        const groundSpeed = leg.groundSpeed ? ` (${leg.groundSpeed} kts)` : '';
+        
         const legDetails = createElement('span', {
           className: 'text-white'
-        }, `${leg.distance}, ${leg.course}, ${leg.time}`);
+        }, `${distance}, ${course}, ${time}${groundSpeed}`);
         
         legDiv.appendChild(legInfo);
         legDiv.appendChild(legDetails);

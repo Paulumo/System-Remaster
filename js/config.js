@@ -18,7 +18,7 @@ export const CONFIG = {
     KML_WAYPOINTS: './src/Waypoint List Rev4.kml',
     ICON_BLACK_TAG: './icon/black-tag.png',
     ICON_BLUE_TAG: './icon/blue-tag.png',
-    ICON_HELI: './icon/heli.png',
+    ICON_HELI: './icon/B-11691.png',
     ICON_HOIST_BAG: './icon/hoist-bag.png'
   },
 
