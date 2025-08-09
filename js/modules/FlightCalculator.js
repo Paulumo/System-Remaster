@@ -550,14 +550,19 @@ export class FlightCalculator {
       const hogeCalculation = this.performanceCalculator.calculateHOGE(
         weather.temperature,
         this.performanceCalculator.getAircraftSpecs().pressureAltitude,
-        domCalculation.dom + fuelAtCriticalPoint
+        domCalculation.dom + fuelAtCriticalPoint,
+        weather.windSpeed,
       );
       
-      // Calculate available payload
-      const payloadCalculation = this.performanceCalculator.calculateAvailablePayload(
+      // Calculate available payload using total fuel and enroute-to-CP burn
+      const timeToCP = this.flightData.performance.criticalPointAnalysis?.timeAtCriticalPoint || 0;
+      const fuelCalc = this.lastCalculationResults.fuel;
+      const payloadCalculation = this.performanceCalculator.calculateAvailablePayloadFromFuel(
         hogeCalculation.hogeWeight,
-        fuelAtCriticalPoint,
-        domCalculation.dom
+        domCalculation.dom,
+        fuelCalc,
+        timeToCP,
+        this.fuelCalculator.getFuelConsumptionRate()
       );
       
       this.lastCalculationResults.performance = {

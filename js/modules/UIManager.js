@@ -678,15 +678,23 @@ export class UIManager {
       // Update performance displays with new comprehensive data
       const hogeValue = domCache.get('#hoge-value');
       const payloadValue = domCache.get('#payload-value');
+      const hogeCalc = performanceResult?.calculations?.hoge;
+      const windBenefits = parseFloat(domCache.get('#wind-benefits')?.value) || 75;
       
       if (hogeValue) {
         hogeValue.textContent = `${performance.hoge} kg`;
         // Add hover tooltip with calculation details
-        hogeValue.title = `HOGE calculated with temperature ${calculations?.hoge?.conditions?.temperature || 25}°C, DOM ${performance.dom} kg`;
+        hogeValue.title = `HOGE calculated with : \n- Temperature : ${calculations?.hoge?.conditions?.temperature || 25}°C, \n- Pressure Altitude : 300 ft \n- Gross Weight : ${hogeCalc.baseGrossWeight} kg \n- Wind Benefits : ${windBenefits}% \n- Headwind Adjustment : ${hogeCalc.headwindAdjustment} kg\n- HOGE = ${hogeCalc.baseGrossWeight} kg + ${hogeCalc.headwindAdjustment} kg = ${performance.hoge} kg`;
       }
       
       if (payloadValue) {
         payloadValue.textContent = `${performance.payloadAvailable} kg`;
+        const color =
+          performance.payloadAvailable < 250 ? '#ef4444' :
+          performance.payloadAvailable < 450 ? '#f59e0b' :
+          '#10b981';
+        payloadValue.style.color = color;
+      
         
         // Enhanced tooltip with hoisting information
         let tooltipText = `Available Payload = HOGE (${performance.hoge}kg) - Fuel at Critical Point (${performance.fuelAtCriticalPoint}kg) - DOM (${performance.dom}kg)`;
@@ -870,29 +878,25 @@ export class UIManager {
   updateStatusIndicator(performance, fuel) {
     const statusDot = document.querySelector('.status-dot');
     const statusText = document.querySelector('.status-text');
-    
     if (!statusDot || !statusText) return;
-    
-    let status = 'success';
+
     let message = 'Performance calculations ready';
-    let dotClass = 'w-2 h-2 bg-[#16a34a] rounded-full animate-pulse';
-    
-    // Check for critical conditions
-    if (performance.payloadAvailable < 200) {
-      status = 'critical';
-      message = 'Critical: Very low payload';
-      dotClass = 'w-2 h-2 bg-[#ef4444] rounded-full animate-pulse';
+    let colorHex = '#16a34a';
+
+    if (performance.payloadAvailable < 250) {
+      message = `Critical: Low payload (${performance.payloadAvailable}kg)`;
+      colorHex = '#ef4444';
     } else if (performance.payloadAvailable < 450) {
-      status = 'warning';
-      message = 'Caution: Limited payload';
-      dotClass = 'w-2 h-2 bg-[#ffc000] rounded-full animate-pulse';
-    } else if (performance.payloadAvailable >= 450) {
-      status = 'good';
+      message = `Caution: Limited payload (${performance.payloadAvailable}kg)`;
+      colorHex = '#f59e0b';
+    } else {
       message = 'Status: Good payload';
-      dotClass = 'w-2 h-2 bg-[#10b981] rounded-full animate-pulse';
-    } 
-    
-    statusDot.className = dotClass;
+      colorHex = '#10b981';
+    }
+
+    // Apply instantly without replacing other classes
+    statusDot.classList.add('w-2', 'h-2', 'rounded-full', 'animate-pulse');
+    statusDot.style.backgroundColor = colorHex;
     statusText.textContent = message;
   }
   
@@ -941,6 +945,11 @@ export class UIManager {
       // Add DOM breakdown
       const performance = performanceResult.performance;
       console.log(`⚙️ Performance Summary:`);
+      const hogeCalc = performanceResult?.calculations?.hoge;
+      if (hogeCalc) {
+        console.log(`Headwind Adjustment: ${hogeCalc.headwindAdjustment}kg`);
+        console.log(`Base Weight: ${hogeCalc.baseGrossWeight}kg`);
+      }
       console.log(`  DOM: ${performance.dom}kg (Empty: ${performance.aircraftEmptyWeight}kg + Crew: ${performance.totalCrewWeight}kg)`);
       console.log(`  HOGE: ${performance.hoge}kg`);
       console.log(`  Payload Available: ${performance.payloadAvailable}kg`);

@@ -13,10 +13,10 @@ def calculate_flight_time():
 
 
      # User input
-    wind_dir = float(180)
-    wind_speed = float(90)
-    mag_course = float(86)
-    distance_nm = float(37.2)
+    wind_dir = float(20)
+    wind_speed = float(27)
+    mag_course = float(266)
+    distance_nm = float(36.7)
 
     # Convert magnetic course to true course
     true_course = mag_course - magnetic_variation
