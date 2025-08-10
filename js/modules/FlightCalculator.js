@@ -552,6 +552,7 @@ export class FlightCalculator {
         this.performanceCalculator.getAircraftSpecs().pressureAltitude,
         domCalculation.dom + fuelAtCriticalPoint,
         weather.windSpeed,
+        weather.windBenefits
       );
       
       // Calculate available payload using total fuel and enroute-to-CP burn

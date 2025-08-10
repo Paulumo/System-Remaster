@@ -10,7 +10,9 @@
       "Bash(python3:*)",
       "Bash(cp:*)",
       "Bash(rm:*)",
-      "Bash(python:*)"
+      "Bash(python:*)",
+      "Bash(npm run convert:pdf:*)",
+      "Bash(npm install)"
     ],
     "deny": []
   }

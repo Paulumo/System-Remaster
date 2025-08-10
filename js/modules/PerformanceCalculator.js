@@ -409,12 +409,14 @@ export class PerformanceCalculator {
   /**
    * Internal helper: Interpolate the incremental headwind adjustment.
    * Performs bilinear interpolation across wind speed and base weight.
+   * Applies wind benefits percentage to the calculated adjustment.
    *
    * @param {number} windSpeed - Headwind component in knots.
    * @param {number} baseWeight - Base gross weight in kilograms.
-   * @returns {number} Weight increment in kilograms.
+   * @param {number} windBenefits - Wind benefits percentage (default 75%, range 0-100).
+   * @returns {number} Weight increment in kilograms after applying wind benefits.
    */
-  _interpolateHeadwindAdjustment(windSpeed, baseWeight) {
+  _interpolateHeadwindAdjustment(windSpeed, baseWeight, windBenefits = 75) {
     // Negative or near‑zero winds yield no increase.  Clamp values below
     // the smallest defined headwind speed (0 kts) to 0.  Values above
     // the highest entry (50 kts) are clamped to the maximum.
@@ -488,12 +490,19 @@ export class PerformanceCalculator {
     const adjLower = interpForRow(rowLower);
     const adjUpper = interpForRow(rowUpper);
 
-    // If wind levels are the same, return directly
+    // If wind levels are the same, apply wind benefits to the single adjustment
     if (w1 === w2) {
-      return adjLower;
+      const windBenefitsDecimal = Math.max(0, Math.min(100, windBenefits)) / 100;
+      return adjLower * windBenefitsDecimal;
     }
     const windRatio = (wind - w1) / (w2 - w1);
-    return adjLower + (adjUpper - adjLower) * windRatio;
+    const rawAdjustment = adjLower + (adjUpper - adjLower) * windRatio;
+    
+    // Apply wind benefits percentage (convert percentage to decimal)
+    const windBenefitsDecimal = Math.max(0, Math.min(100, windBenefits)) / 100;
+    const adjustedPayload = rawAdjustment * windBenefitsDecimal;
+    
+    return adjustedPayload;
   }
 
   /**
@@ -551,17 +560,18 @@ export class PerformanceCalculator {
    * @param {number} pressureAltitude - Pressure altitude in feet (ft)
    * @param {number} aircraftWeight - Current aircraft weight in kg (ignored)
    * @param {number} windSpeed - Headwind component in knots (kts)
+   * @param {number} windBenefits - Wind benefits percentage (default 75%, range 0-100)
    * @returns {Object} HOGE calculation result
    */
-  calculateHOGE(temperature = this.STANDARD_TEMPERATURE, pressureAltitude = this.PRESSURE_ALTITUDE, aircraftWeight = 4000, windSpeed = 0) {
+  calculateHOGE(temperature = this.STANDARD_TEMPERATURE, pressureAltitude = this.PRESSURE_ALTITUDE, aircraftWeight = 4000, windSpeed = 0, windBenefits = 75) {
     try {
       // Step 1: Base gross weight from sea-level OAT table (no altitude factor)
       const baseWeight = this._seaLevelBaseWeightForOAT(temperature);
-      // Step 2: Headwind adjustment based on gross weight and wind speed
-      const headwindAdjustment = this._interpolateHeadwindAdjustment(windSpeed, baseWeight);
-      // Report the unfactored increase of gross weight for debugging
+      // Step 2: Headwind adjustment based on gross weight and wind speed with wind benefits
+      const headwindAdjustment = this._interpolateHeadwindAdjustment(windSpeed, baseWeight, windBenefits);
+      // Report the increase of gross weight with wind benefits applied for debugging
       console.log(
-        `Unfactored increase of gross weight (headwind ${windSpeed} kts, base weight ${baseWeight.toFixed(1)} kg): ${headwindAdjustment.toFixed(1)} kg`
+        `Increase of gross weight with ${windBenefits}% wind benefits (headwind ${windSpeed} kts, base weight ${baseWeight.toFixed(1)} kg): ${headwindAdjustment.toFixed(1)} kg`
       );
       // Sum to obtain allowable HOGE gross weight
       const hogeWeight = baseWeight + headwindAdjustment;
@@ -572,11 +582,13 @@ export class PerformanceCalculator {
         conditions: {
           temperature: temperature,
           pressureAltitude: pressureAltitude,
-          windSpeed: windSpeed
+          windSpeed: windSpeed,
+          windBenefits: windBenefits
         },
         notes: [
           'Base weight from sea-level OAT table (Figure S5‑32); altitude not applied',
-          'Headwind increment interpolated from detailed table'
+          'Headwind increment interpolated from detailed table',
+          `Wind benefits applied: ${windBenefits}% of calculated headwind adjustment`
         ],
         calculatedAt: new Date().toISOString()
       };

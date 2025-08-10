@@ -684,7 +684,7 @@ export class UIManager {
       if (hogeValue) {
         hogeValue.textContent = `${performance.hoge} kg`;
         // Add hover tooltip with calculation details
-        hogeValue.title = `HOGE calculated with : \n- Temperature : ${calculations?.hoge?.conditions?.temperature || 25}°C, \n- Pressure Altitude : 300 ft \n- Gross Weight : ${hogeCalc.baseGrossWeight} kg \n- Wind Benefits : ${windBenefits}% \n- Headwind Adjustment : ${hogeCalc.headwindAdjustment} kg\n- HOGE = ${hogeCalc.baseGrossWeight} kg + ${hogeCalc.headwindAdjustment} kg = ${performance.hoge} kg`;
+        hogeValue.title = `HOGE calculated with : \n- Temperature : ${calculations?.hoge?.conditions?.temperature || 25} °C, \n- Pressure Altitude : 300 ft \n- Gross Weight : ${hogeCalc.baseGrossWeight} kg \n- Wind Benefits : ${windBenefits}% \n- Headwind Adjustment : ${hogeCalc.headwindAdjustment} kg\n \rHOGE = ${hogeCalc.baseGrossWeight} kg + ${hogeCalc.headwindAdjustment} kg = ${performance.hoge} kg`;
       }
       
       if (payloadValue) {
@@ -699,13 +699,20 @@ export class UIManager {
         // Enhanced tooltip with hoisting information
         let tooltipText = `Available Payload = HOGE (${performance.hoge}kg) - Fuel at Critical Point (${performance.fuelAtCriticalPoint}kg) - DOM (${performance.dom}kg)`;
         
-        // Add hoisting information if available
+        // Add critical point information if available
         const criticalPointAnalysis = performance.criticalPointAnalysis;
-        if (criticalPointAnalysis && criticalPointAnalysis.hoisting) {
-          const hoisting = criticalPointAnalysis.hoisting;
-          tooltipText += `\n\nHoisting Details:\n- Fuel before hoisting: ${performance.fuelAtCriticalPoint}kg\n- Hoisting time: ${hoisting.hoistingTime}min\n- Hoisting fuel burn: ${hoisting.hoistingFuelBurn}kg\n- Fuel after hoisting: ${hoisting.fuelAfterHoisting}kg`;
-        }
+        const totalFuel = domCache.get('#total-fuel');
         
+        if (criticalPointAnalysis && criticalPointAnalysis.waypoint) {
+          // Calculate enroute fuel: time to critical point × fuel consumption rate (5 kg/min)
+          const timeToCP = criticalPointAnalysis.timeAtCriticalPoint || 0;
+          const enrouteFuel = Math.round(timeToCP * 5); // 5 kg/min fuel consumption
+          
+          tooltipText += `\n\nFuel at Critical Point (${criticalPointAnalysis.waypoint}) :\n${totalFuel.textContent} (total fuel) - 60 kg (taxi fuel) - ${enrouteFuel} kg (enroute fuel to critical point) = ${performance.fuelAtCriticalPoint} kg
+          \nDry Operating Mass : \n${performance.aircraftEmptyWeight} kg (empty weight) + ${performance.totalCrewWeight} kg (crew weight) = ${performance.dom} kg`;
+          
+        }
+
         payloadValue.title = tooltipText;
       }
       

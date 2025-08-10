@@ -8,7 +8,8 @@
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "render:hoge": "node scripts/render-hoge-pdf.js"
+    "render:hoge": "node scripts/render-hoge-pdf.js",
+    "convert:pdf": "node scripts/convert-pdf-to-png.js"
   },
   "repository": {
     "type": "git",
