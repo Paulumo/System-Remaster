@@ -4,6 +4,7 @@
  */
 
 import { CONFIG } from '../config.js';
+import { HOGEChartGenerator } from './HOGEChartGenerator.js';
 import { createElement, domCache, addEventListenerWithCleanup, scrollToElement } from './utils/dom.js';
 import { validateCrewName, validateCallsign, showFieldError, clearFieldError, showFieldSuccess } from './utils/validation.js';
 import { sanitizeInput } from './utils/security.js';
@@ -464,11 +465,22 @@ export class UIManager {
    * @private
    */
   setupCalculationPanel() {
-    // Recalculate button
-    const recalculateBtn = domCache.get('#recalculate-btn');
-    if (recalculateBtn) {
-      const cleanup1 = addEventListenerWithCleanup(recalculateBtn, 'click', () => {
-        this.performCalculations();
+    // Performance button -> opens PDF window
+    const performanceBtn = domCache.get('#performance-btn');
+    if (performanceBtn) {
+      const cleanup1 = addEventListenerWithCleanup(performanceBtn, 'click', async () => {
+        try {
+          // Ensure latest calculations
+          this.performCalculations();
+          // Gather current inputs
+          const temperature = parseFloat(domCache.get('#temperature')?.value) || 25;
+          const altitude = 300; // Default altitude used in calculations
+          const generator = new HOGEChartGenerator();
+          await generator.openPerformancePDF({ temperature, altitude, filename: 'HOGE_Chart.pdf' });
+        } catch (err) {
+          console.error('Failed to open performance PDF:', err);
+          this.showError('Failed to open performance PDF');
+        }
       });
       this.eventCleanupFunctions.push(cleanup1);
     }
@@ -685,6 +697,8 @@ export class UIManager {
         hogeValue.textContent = `${performance.hoge} kg`;
         // Add hover tooltip with calculation details
         hogeValue.title = `HOGE calculated with : \n- Temperature : ${calculations?.hoge?.conditions?.temperature || 25} °C, \n- Pressure Altitude : 300 ft \n- Gross Weight : ${hogeCalc.baseGrossWeight} kg \n- Wind Benefits : ${windBenefits}% \n- Headwind Adjustment : ${hogeCalc.headwindAdjustment} kg\n \rHOGE = ${hogeCalc.baseGrossWeight} kg + ${hogeCalc.headwindAdjustment} kg = ${performance.hoge} kg`;
+        // Attach hover preview for PDF
+        this.attachHogePreview(hogeValue);
       }
       
       if (payloadValue) {
@@ -728,6 +742,145 @@ export class UIManager {
       console.error('Error updating calculation display:', error);
     }
   }
+
+  /**
+   * Attach hover preview popover to the HOGE value element
+   * @private
+   * @param {HTMLElement} hogeEl
+   */
+  attachHogePreview(hogeEl) {
+    if (!hogeEl || hogeEl.__hasPreview) return;
+  
+    let isPinned = false;                 // <— track pin state
+    let outsideClickHandler = null;
+    let escHandler = null;
+  
+    const showPreview = async () => {
+      try {
+        const generator = new HOGEChartGenerator();
+        const aspect = 842 / 595; // A4 portrait
+  
+        const maxW = Math.floor(window.innerWidth );
+        const maxH = Math.floor(window.innerHeight );
+  
+        let widthPx, heightPx;
+        if (maxW / aspect > maxH) {
+          heightPx = maxH;
+          widthPx = Math.floor(maxH / aspect);
+        } else {
+          widthPx = maxW;
+          heightPx = Math.floor(maxW * aspect);
+        }
+  
+        const embedHTML = generator.getEmbedHTML(widthPx, heightPx);
+  
+        let preview = document.getElementById('hoge-preview-popover');
+        if (!preview) {
+          preview = document.createElement('div');
+          preview.id = 'hoge-preview-popover';
+          preview.style.position = 'fixed';
+          preview.style.top = '50%';
+          preview.style.left = '50%';
+          preview.style.transform = 'translate(-50%, -50%)';
+          preview.style.zIndex = '10005';
+          preview.style.border = '1px solid #2c333f';
+          preview.style.background = '#1c1f26';
+          preview.style.borderRadius = '10px';
+          preview.style.boxShadow = '0 20px 60px rgba(0,0,0,0.6)';
+          preview.style.boxSizing = 'border-box';   // <— include padding in size
+          preview.style.padding = '8px';
+          preview.style.width = `${widthPx}px`;     // <— exact content size
+          preview.style.height = `${heightPx}px`;
+          preview.style.display = 'none';
+          preview.style.pointerEvents = 'auto';
+          preview.style.overflow = 'hidden';        // <— no internal scrollbars
+  
+          // Optional close button
+          const closeBtn = document.createElement('button');
+          closeBtn.textContent = '×';
+          closeBtn.setAttribute('aria-label', 'Close');
+          closeBtn.style.position = 'absolute';
+          closeBtn.style.top = '6px';
+          closeBtn.style.right = '10px';
+          closeBtn.style.fontSize = '18px';
+          closeBtn.style.color = '#a0a9bb';
+          closeBtn.style.background = 'transparent';
+          closeBtn.style.border = '0';
+          closeBtn.style.cursor = 'pointer';
+          closeBtn.addEventListener('click', () => {
+            isPinned = false;
+            hidePreview();
+          });
+          preview.appendChild(closeBtn);
+  
+          document.body.appendChild(preview);
+        } else {
+          preview.style.width = `${widthPx}px`;
+          preview.style.height = `${heightPx}px`;
+        }
+  
+        // Inject (or re-inject) the embed
+        // Keep the close button if present
+        const oldClose = preview.querySelector('button[aria-label="Close"]');
+        preview.innerHTML = oldClose ? oldClose.outerHTML + embedHTML : embedHTML;
+  
+        preview.style.display = 'block';
+      } catch (e) {
+        console.warn('HOGE preview failed:', e);
+      }
+    };
+  
+    const hidePreview = () => {
+      if (isPinned) return;               // <— do not hide if pinned
+      const preview = document.getElementById('hoge-preview-popover');
+      if (preview) preview.style.display = 'none';
+      // Clean up handlers when not pinned
+      if (outsideClickHandler) {
+        document.removeEventListener('mousedown', outsideClickHandler, true);
+        outsideClickHandler = null;
+      }
+      if (escHandler) {
+        document.removeEventListener('keydown', escHandler, true);
+        escHandler = null;
+      }
+    };
+  
+    // Hover behavior (unchanged except respecting pin)
+    const cleanupEnter = addEventListenerWithCleanup(hogeEl, 'mouseenter', showPreview);
+    const cleanupLeave = addEventListenerWithCleanup(hogeEl, 'mouseleave', hidePreview);
+  
+    // Click to pin
+    const cleanupClick = addEventListenerWithCleanup(hogeEl, 'click', (e) => {
+      e.stopPropagation();
+      isPinned = true;
+      showPreview();
+  
+      // Close when clicking outside the preview or pressing ESC
+      if (!outsideClickHandler) {
+        outsideClickHandler = (evt) => {
+          const preview = document.getElementById('hoge-preview-popover');
+          if (preview && !preview.contains(evt.target) && evt.target !== hogeEl) {
+            isPinned = false;
+            hidePreview();
+          }
+        };
+        document.addEventListener('mousedown', outsideClickHandler, true);
+      }
+      if (!escHandler) {
+        escHandler = (evt) => {
+          if (evt.key === 'Escape') {
+            isPinned = false;
+            hidePreview();
+          }
+        };
+        document.addEventListener('keydown', escHandler, true);
+      }
+    });
+  
+    this.eventCleanupFunctions.push(cleanupEnter, cleanupLeave, cleanupClick);
+    hogeEl.__hasPreview = true;
+  }
+  
 
   /**
    * Update discretion fuel

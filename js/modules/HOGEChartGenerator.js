@@ -1,702 +1,790 @@
 /**
- * HOGEChartGenerator - Generates HOGE performance charts with temperature overlays
- * Creates visual representations of AW169 HOGE performance with user-defined temperature lines
+ * HOGEChartGenerator
+ * Lightweight helper to reference and open the HOGE performance PDF
+ * located at `./HOGE/Figure S5-32 HOGE.pdf`.
+ *
+ * Note: We intentionally avoid bundling PDF.js here to keep the
+ * footprint small. We open the PDF directly and use inline embeds
+ * for previews.
  */
 
 export class HOGEChartGenerator {
-  constructor() {
-    // Chart dimensions and scaling factors (A4 portrait: 210mm x 297mm = 595x842 pts)
-    this.CHART_WIDTH = 595;
-    this.CHART_HEIGHT = 842;
-    this.MARGIN = { top: 50, right: 50, bottom: 50, left: 50 };
+  /**
+   * @param {Object} [options]
+   * @param {string} [options.pdfPath]
+   */
+  constructor(options = {}) {
+    this.imagePath = options.imagePath || './src/Figure S5-32 HOGE-1.jpg';
     
-    // Base PDF path
-    this.BASE_PDF_PATH = './HOGE/Figure S5-32 HOGE.pdf';
-    
-    // Chart coordinate system based on the PDF
-    this.CHART_BOUNDS = {
-      // Gross weight range in kg x 100 (33-49 on chart = 3300-4900 kg)
-      weightMin: 33,
-      weightMax: 49,
-      // Pressure altitude in ft x 1000 (-1 to 15 = -1000 to 15000 ft)
-      altitudeMin: -1,
-      altitudeMax: 15
-    };
-    
-    // Temperature curves data points from the PDF chart
-    this.TEMPERATURE_CURVES = [
+    // HOGE OAT line data points (temperature vs gross weight capacity)
+
+    this.HOGE_OAT_LINES = [
       {
         oat: 0,
         points: [
-          { altitude: 9.2, weight: 33 },
-          { altitude: 5.6, weight: 38 },
-          { altitude: 2.0, weight: 43.5 },
-          { altitude: 1.0, weight: 44.2 },
-          { altitude: -1.0, weight: 44.7 }
+          { alt: 9.2, weight: 33 },
+          { alt: 5.6, weight: 38 },
+          { alt: 2.0, weight: 43.5 },
+          { alt: 1.0, weight: 44.2 },
+          { alt: -1.0, weight: 44.7 }
         ]
       },
       {
         oat: 10,
         points: [
-          { altitude: 8.0, weight: 33 },
-          { altitude: 5.0, weight: 37 },
-          { altitude: 1.0, weight: 43.1 },
-          { altitude: 0.0, weight: 44.0 },
-          { altitude: -1.0, weight: 44.3 }
+          { alt: 8.0, weight: 33 },
+          { alt: 5.0, weight: 37 },
+          { alt: 1.0, weight: 43.1 },
+          { alt: 0.0, weight: 44.0 },
+          { alt: -1.0, weight: 44.3 }
         ]
       },
       {
         oat: 20,
         points: [
-          { altitude: 6.6, weight: 33 },
-          { altitude: 4.4, weight: 36 },
-          { altitude: 0.0, weight: 42.5 },
-          { altitude: -1.0, weight: 43.5 }
+          { alt: 6.6, weight: 33 },
+          { alt: 4.4, weight: 36 },
+          { alt: 0.0, weight: 42.5 },
+          { alt: -1.0, weight: 43.5 }
         ]
       },
       {
         oat: 30,
         points: [
-          { altitude: 5.4, weight: 33 },
-          { altitude: 2.4, weight: 37 },
-          { altitude: -1.0, weight: 42 }
+          { alt: 5.4, weight: 33 },
+          { alt: 2.4, weight: 37 },
+          { alt: -1.0, weight: 42 }
         ]
       },
       {
         oat: 40,
         points: [
-          { altitude: 3.6, weight: 33 },
-          { altitude: 1.0, weight: 36.2 },
-          { altitude: -1.0, weight: 39.1 }
+          { alt: 3.48, weight: 33 },
+          { alt: 1.2, weight: 36.2 },
+          { alt: 0.6, weight: 37 },
+          { alt: -1.0, weight: 39.2 }
         ]
       }
     ];
-    
-    // ISA temperature lines
-    this.ISA_LINES = [
-      { label: 'ISA', temp: 15, color: '#059669' },
-      { label: 'ISA+10', temp: 25, color: '#10b981' },
-      { label: 'ISA+20', temp: 35, color: '#34d399' },
-      { label: 'ISA+35', temp: 50, color: '#6ee7b7' }
-    ];
-    
-    this.canvas = null;
-    this.ctx = null;
-    this.basePDFImage = null;
   }
 
   /**
-   * Load the base PDF as an image background
-   * @returns {Promise<Image>} Loaded PDF image
+   * Returns the URL to the HOGE image
+   * @returns {string}
    */
-  async loadBasePDF() {
-    return new Promise((resolve, reject) => {
-      // Convert PDF to image using a canvas approach or use pre-converted image
-      // For now, we'll create a mock base image with the chart background
-      const img = new Image();
-      img.onload = () => {
-        this.basePDFImage = img;
-        resolve(img);
-      };
-      img.onerror = () => {
-        console.warn('Could not load base PDF, creating synthetic background');
-        // Create a synthetic background if PDF loading fails
-        this.createSyntheticBackground();
-        resolve(null);
-      };
-      
-      // Try to load a pre-converted PNG version of the PDF
-      img.src = './HOGE/Figure_S5-32_HOGE.png';
-    });
+  getImageUrl() {
+    return this.imagePath;
   }
 
   /**
-   * Create a synthetic background matching the PDF chart
+   * Opens the performance image in a new tab/window.
+   * 
+   * @param {Object} params
+   * @param {number} [params.temperature]
+   * @param {number} [params.altitude]
+   * @param {string} [params.filename]
    */
-  createSyntheticBackground() {
-    // This will create the background using our existing drawing methods
-    this.basePDFImage = null; // Will trigger synthetic drawing in generateChart
-  }
-
-  /**
-   * Initialize the chart canvas and context
-   * @param {HTMLCanvasElement} canvasElement - Canvas element to render on
-   */
-  initializeCanvas(canvasElement) {
-    this.canvas = canvasElement;
-    this.canvas.width = this.CHART_WIDTH;
-    this.canvas.height = this.CHART_HEIGHT;
-    this.ctx = this.canvas.getContext('2d');
-    
-    // Set canvas styling
-    this.ctx.fillStyle = '#ffffff';
-    this.ctx.fillRect(0, 0, this.CHART_WIDTH, this.CHART_HEIGHT);
-    this.ctx.strokeStyle = '#000000';
-    this.ctx.lineWidth = 1;
-  }
-
-  /**
-   * Draw the base PDF image as background
-   */
-  drawBasePDF() {
-    const { ctx } = this;
-    
-    if (this.basePDFImage) {
-      // Draw the base PDF image to fill the canvas
-      ctx.drawImage(this.basePDFImage, 0, 0, this.CHART_WIDTH, this.CHART_HEIGHT);
-    } else {
-      // Draw synthetic background if no base image
-      this.drawSyntheticBackground();
-    }
-  }
-
-  /**
-   * Draw synthetic background matching the original PDF
-   */
-  drawSyntheticBackground() {
-    // Fill background with white
-    this.ctx.fillStyle = '#ffffff';
-    this.ctx.fillRect(0, 0, this.CHART_WIDTH, this.CHART_HEIGHT);
-    
-    // Draw all the base chart elements
-    this.drawGrid();
-    this.drawAxes();
-    this.drawTemperatureCurves();
-    this.drawISALines();
-    this.drawTitle();
-  }
-
-  /**
-   * Convert chart coordinates to canvas coordinates
-   * @param {number} weight - Gross weight in hundreds of kg (33-49)
-   * @param {number} altitude - Pressure altitude in thousands of ft (-1 to 15)
-   * @returns {Object} Canvas coordinates {x, y}
-   */
-  chartToCanvas(weight, altitude) {
-    // Adjust for A4 size and proper chart area
-    const chartArea = {
-      left: this.CHART_WIDTH * 0.15,   // 15% from left
-      right: this.CHART_WIDTH * 0.85,  // 85% from left
-      top: this.CHART_HEIGHT * 0.2,    // 20% from top
-      bottom: this.CHART_HEIGHT * 0.8  // 80% from top
-    };
-    
-    const chartWidth = chartArea.right - chartArea.left;
-    const chartHeight = chartArea.bottom - chartArea.top;
-    
-    const x = chartArea.left + 
-      ((weight - this.CHART_BOUNDS.weightMin) / (this.CHART_BOUNDS.weightMax - this.CHART_BOUNDS.weightMin)) * chartWidth;
-    
-    const y = chartArea.top + 
-      ((this.CHART_BOUNDS.altitudeMax - altitude) / (this.CHART_BOUNDS.altitudeMax - this.CHART_BOUNDS.altitudeMin)) * chartHeight;
-    
-    return { x, y };
-  }
-
-  /**
-   * Draw the chart grid and axes
-   */
-  drawGrid() {
-    const { ctx } = this;
-    const chartWidth = this.CHART_WIDTH - this.MARGIN.left - this.MARGIN.right;
-    const chartHeight = this.CHART_HEIGHT - this.MARGIN.top - this.MARGIN.bottom;
-    
-    ctx.strokeStyle = '#e5e7eb';
-    ctx.lineWidth = 0.5;
-    
-    // Vertical grid lines (weight)
-    for (let weight = this.CHART_BOUNDS.weightMin; weight <= this.CHART_BOUNDS.weightMax; weight += 2) {
-      const { x } = this.chartToCanvas(weight, 0);
-      ctx.beginPath();
-      ctx.moveTo(x, this.MARGIN.top);
-      ctx.lineTo(x, this.MARGIN.top + chartHeight);
-      ctx.stroke();
-    }
-    
-    // Horizontal grid lines (altitude)
-    for (let alt = this.CHART_BOUNDS.altitudeMin; alt <= this.CHART_BOUNDS.altitudeMax; alt += 2) {
-      const { y } = this.chartToCanvas(0, alt);
-      ctx.beginPath();
-      ctx.moveTo(this.MARGIN.left, y);
-      ctx.lineTo(this.MARGIN.left + chartWidth, y);
-      ctx.stroke();
-    }
-    
-    // Draw axes
-    ctx.strokeStyle = '#374151';
-    ctx.lineWidth = 2;
-    
-    // X-axis
-    ctx.beginPath();
-    ctx.moveTo(this.MARGIN.left, this.MARGIN.top + chartHeight);
-    ctx.lineTo(this.MARGIN.left + chartWidth, this.MARGIN.top + chartHeight);
-    ctx.stroke();
-    
-    // Y-axis
-    ctx.beginPath();
-    ctx.moveTo(this.MARGIN.left, this.MARGIN.top);
-    ctx.lineTo(this.MARGIN.left, this.MARGIN.top + chartHeight);
-    ctx.stroke();
-  }
-
-  /**
-   * Draw axis labels and scales
-   */
-  drawAxes() {
-    const { ctx } = this;
-    const chartWidth = this.CHART_WIDTH - this.MARGIN.left - this.MARGIN.right;
-    const chartHeight = this.CHART_HEIGHT - this.MARGIN.top - this.MARGIN.bottom;
-    
-    ctx.fillStyle = '#374151';
-    ctx.font = '12px Arial';
-    ctx.textAlign = 'center';
-    
-    // X-axis labels (gross weight)
-    for (let weight = this.CHART_BOUNDS.weightMin; weight <= this.CHART_BOUNDS.weightMax; weight += 2) {
-      const { x } = this.chartToCanvas(weight, 0);
-      ctx.fillText(weight.toString(), x, this.MARGIN.top + chartHeight + 20);
-    }
-    
-    // X-axis title
-    ctx.font = '14px Arial';
-    ctx.fillText('GROSS WEIGHT [kg x 100]', 
-      this.MARGIN.left + chartWidth / 2, 
-      this.MARGIN.top + chartHeight + 50);
-    
-    // Y-axis labels (altitude)
-    ctx.textAlign = 'right';
-    ctx.font = '12px Arial';
-    for (let alt = this.CHART_BOUNDS.altitudeMin; alt <= this.CHART_BOUNDS.altitudeMax; alt += 2) {
-      const { y } = this.chartToCanvas(0, alt);
-      ctx.fillText(alt.toString(), this.MARGIN.left - 10, y + 4);
-    }
-    
-    // Y-axis title (rotated)
-    ctx.save();
-    ctx.translate(20, this.MARGIN.top + chartHeight / 2);
-    ctx.rotate(-Math.PI / 2);
-    ctx.font = '14px Arial';
-    ctx.textAlign = 'center';
-    ctx.fillText('PRESSURE ALTITUDE [ft x 1000]', 0, 0);
-    ctx.restore();
-  }
-
-  /**
-   * Draw temperature curves
-   */
-  drawTemperatureCurves() {
-    const { ctx } = this;
-    
-    this.TEMPERATURE_CURVES.forEach(curve => {
-      if (curve.points.length < 2) return;
-      
-      ctx.strokeStyle = curve.color;
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      
-      const firstPoint = this.chartToCanvas(curve.points[0].weight, curve.points[0].altitude);
-      ctx.moveTo(firstPoint.x, firstPoint.y);
-      
-      for (let i = 1; i < curve.points.length; i++) {
-        const point = this.chartToCanvas(curve.points[i].weight, curve.points[i].altitude);
-        ctx.lineTo(point.x, point.y);
+  async openPerformancePDF(params = {}) {
+    // Generate enhanced image with overlay first
+    try {
+      const enhancedImageUrl = await this.generateEnhancedImage();
+      const win = window.open(enhancedImageUrl, '_blank', 'noopener,noreferrer');
+      if (!win) {
+        window.location.href = enhancedImageUrl;
       }
-      
-      ctx.stroke();
-      
-      // Add temperature label at the end of the curve
-      const lastPoint = curve.points[curve.points.length - 1];
-      const labelPos = this.chartToCanvas(lastPoint.weight, lastPoint.altitude);
-      
-      ctx.fillStyle = curve.color;
-      ctx.font = '10px Arial';
-      ctx.textAlign = 'left';
-      ctx.fillText(`${curve.temp}°C`, labelPos.x + 5, labelPos.y);
-    });
+    } catch (error) {
+      console.error('Failed to generate enhanced image, opening original:', error);
+      const url = this.getImageUrl();
+      const win = window.open(url, '_blank', 'noopener,noreferrer');
+      if (!win) {
+        window.location.href = url;
+      }
+    }
   }
 
   /**
-   * Draw ISA reference lines
+   * Builds HTML string for embedding the enhanced image.
+   * @param {number} widthPx
+   * @param {number} heightPx
+   * @returns {string}
    */
-  drawISALines() {
-    const { ctx } = this;
-    
-    this.ISA_LINES.forEach(isaLine => {
-      // Find corresponding temperature curve or interpolate
-      const curve = this.findTemperatureCurve(isaLine.temp);
-      if (curve && curve.points.length >= 2) {
-        ctx.strokeStyle = isaLine.color;
-        ctx.lineWidth = 1.5;
-        ctx.setLineDash([5, 5]);
-        
-        ctx.beginPath();
-        const firstPoint = this.chartToCanvas(curve.points[0].weight, curve.points[0].altitude);
-        ctx.moveTo(firstPoint.x, firstPoint.y);
-        
-        for (let i = 1; i < curve.points.length; i++) {
-          const point = this.chartToCanvas(curve.points[i].weight, curve.points[i].altitude);
-          ctx.lineTo(point.x, point.y);
+  getEmbedHTML(widthPx, heightPx) {
+    const safeWidth = Math.max(200, Math.floor(widthPx || 800));
+    const safeHeight = Math.max(200, Math.floor(heightPx || 600));
+  
+    // Generate enhanced image with overlay
+    this.generateEnhancedImage().then(enhancedImageUrl => {
+      // Update the image src when enhanced version is ready
+      const preview = document.getElementById('hoge-preview-popover');
+      if (preview) {
+        const img = preview.querySelector('img');
+        if (img) {
+          img.src = enhancedImageUrl;
         }
-        
-        ctx.stroke();
-        ctx.setLineDash([]);
-        
-        // Add ISA label
-        const midPoint = curve.points[Math.floor(curve.points.length / 2)];
-        const labelPos = this.chartToCanvas(midPoint.weight, midPoint.altitude);
-        
-        ctx.fillStyle = isaLine.color;
-        ctx.font = '10px Arial';
-        ctx.textAlign = 'center';
-        ctx.fillText(isaLine.label, labelPos.x, labelPos.y - 10);
       }
+    }).catch(err => {
+      console.warn('Failed to generate enhanced image, using original:', err);
     });
-  }
-
-  /**
-   * Find or interpolate temperature curve for given temperature
-   * @param {number} temperature - Temperature in Celsius
-   * @returns {Object} Temperature curve data
-   */
-  findTemperatureCurve(temperature) {
-    // Find exact match
-    const exactMatch = this.TEMPERATURE_CURVES.find(curve => curve.temp === temperature);
-    if (exactMatch) return exactMatch;
-    
-    // Find bounding curves for interpolation
-    const sortedCurves = this.TEMPERATURE_CURVES.slice().sort((a, b) => a.temp - b.temp);
-    let lowerCurve = null, upperCurve = null;
-    
-    for (let i = 0; i < sortedCurves.length - 1; i++) {
-      if (sortedCurves[i].temp <= temperature && sortedCurves[i + 1].temp >= temperature) {
-        lowerCurve = sortedCurves[i];
-        upperCurve = sortedCurves[i + 1];
-        break;
-      }
-    }
-    
-    if (!lowerCurve || !upperCurve) {
-      // Use closest curve if outside range
-      return sortedCurves.reduce((prev, current) => 
-        Math.abs(current.temp - temperature) < Math.abs(prev.temp - temperature) ? current : prev
-      );
-    }
-    
-    // Interpolate between curves
-    const ratio = (temperature - lowerCurve.temp) / (upperCurve.temp - lowerCurve.temp);
-    const interpolatedPoints = [];
-    
-    const minPoints = Math.min(lowerCurve.points.length, upperCurve.points.length);
-    for (let i = 0; i < minPoints; i++) {
-      const lowerPoint = lowerCurve.points[i];
-      const upperPoint = upperCurve.points[i];
-      
-      interpolatedPoints.push({
-        weight: lowerPoint.weight + (upperPoint.weight - lowerPoint.weight) * ratio,
-        altitude: lowerPoint.altitude + (upperPoint.altitude - lowerPoint.altitude) * ratio
-      });
-    }
-    
-    return {
-      temp: temperature,
-      color: '#ef4444',
-      points: interpolatedPoints
-    };
-  }
-
-  /**
-   * Draw the red horizontal line at specified altitude (300 ft = 0.3 on chart)
-   * @param {number} altitudeFt - Altitude in feet (default 300)
-   */
-  drawAltitudeLine(altitudeFt = 300) {
-    const { ctx } = this;
-    
-    // Convert altitude to chart units (300 ft = 0.3 in thousands)
-    const altitudeChart = altitudeFt / 1000;
-    
-    // Get the chart area bounds
-    const chartArea = {
-      left: this.CHART_WIDTH * 0.15,
-      right: this.CHART_WIDTH * 0.85,
-      top: this.CHART_HEIGHT * 0.2,
-      bottom: this.CHART_HEIGHT * 0.8
-    };
-    
-    // Calculate y position using the chart coordinate system
-    const { y } = this.chartToCanvas(this.CHART_BOUNDS.weightMin, altitudeChart);
-    
-    // Draw red horizontal line across the chart area
-    ctx.strokeStyle = '#ef4444';
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.moveTo(chartArea.left, y);
-    ctx.lineTo(chartArea.right, y);
-    ctx.stroke();
-    
-    // Add altitude label on the right side
-    ctx.fillStyle = '#ef4444';
-    ctx.font = 'bold 14px Arial';
-    ctx.textAlign = 'left';
-    ctx.fillText(`${altitudeFt} ft`, chartArea.right + 10, y + 5);
-  }
-
-  /**
-   * Draw chart title and headers
-   */
-  drawTitle() {
-    const { ctx } = this;
-    
-    // Main title
-    ctx.fillStyle = '#1f2937';
-    ctx.font = 'bold 18px Arial';
-    ctx.textAlign = 'center';
-    ctx.fillText('HOVER CEILING OUT OF GROUND EFFECT', 
-      this.CHART_WIDTH / 2, 25);
-    
-    // Subtitle
-    ctx.font = '14px Arial';
-    ctx.fillText('UNFACTORED HEADWIND - OEI 2.5 min', 
-      this.CHART_WIDTH / 2, 45);
-    
-    // Enhanced performance note
-    ctx.font = '12px Arial';
-    ctx.fillText('ENHANCED PERFORMANCE', 
-      this.CHART_WIDTH / 2, 65);
-  }
-
-  /**
-   * Add user input information panel
-   * @param {number} temperature - User input temperature
-   * @param {number} altitude - Altitude in feet (default 300)
-   */
-  drawUserInputPanel(temperature, altitude = 300) {
-    const { ctx } = this;
-    const panelX = this.CHART_WIDTH - this.MARGIN.right + 20;
-    const panelY = this.MARGIN.top + 20;
-    
-    // Panel background
-    ctx.fillStyle = '#f8fafc';
-    ctx.strokeStyle = '#e2e8f0';
-    ctx.lineWidth = 1;
-    ctx.fillRect(panelX, panelY, 120, 100);
-    ctx.strokeRect(panelX, panelY, 120, 100);
-    
-    // Panel title
-    ctx.fillStyle = '#1e40af';
-    ctx.font = 'bold 12px Arial';
-    ctx.textAlign = 'left';
-    ctx.fillText('USER INPUT', panelX + 10, panelY + 20);
-    
-    // Temperature
-    ctx.fillStyle = '#374151';
-    ctx.font = '11px Arial';
-    ctx.fillText(`Temperature: ${temperature}°C`, panelX + 10, panelY + 40);
-    
-    // Altitude
-    ctx.fillText(`Altitude: ${altitude} ft`, panelX + 10, panelY + 55);
-    
-    // Date/time
-    const now = new Date();
-    ctx.font = '9px Arial';
-    ctx.fillStyle = '#6b7280';
-    ctx.fillText(`Generated: ${now.toLocaleString()}`, panelX + 10, panelY + 85);
-  }
-
-  /**
-   * Generate the complete HOGE chart
-   * @param {HTMLCanvasElement} canvasElement - Canvas to render on
-   * @param {number} temperature - User input temperature in Celsius
-   * @param {number} altitude - Altitude in feet (default 300)
-   * @returns {Promise<void>}
-   */
-  async generateChart(canvasElement, temperature = 25, altitude = 300) {
-    try {
-      this.initializeCanvas(canvasElement);
-      
-      // Load base PDF first
-      await this.loadBasePDF();
-      
-      // Draw base PDF background
-      this.drawBasePDF();
-      
-      // Only draw the overlay elements
-      this.drawAltitudeLine(altitude);
-      this.drawUserInputPanel(temperature, altitude);
-      
-      console.log(`HOGE chart generated with temperature ${temperature}°C at ${altitude} ft`);
-      
-    } catch (error) {
-      console.error('Error generating HOGE chart:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Convert canvas to PDF blob for download
-   * @param {string} filename - PDF filename
-   * @returns {Promise<Blob>} PDF blob
-   */
-  async generatePDF(filename = 'hoge_chart.pdf') {
-    if (!this.canvas) {
-      throw new Error('Canvas not initialized. Call generateChart first.');
-    }
-    
-    try {
-      // Convert canvas to data URL
-      const imageDataURL = this.canvas.toDataURL('image/png', 1.0);
-      
-      // Create PDF using browser's built-in PDF capabilities
-      // This creates a data URL that can be downloaded
-      const pdfContent = this.createPDFContent(imageDataURL, filename);
-      
-      // Return as blob for download
-      return new Promise((resolve) => {
-        this.canvas.toBlob((blob) => {
-          resolve(blob);
-        }, 'image/png', 1.0);
-      });
-    } catch (error) {
-      console.error('Error generating PDF:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Create PDF content HTML for printing/saving
-   * @param {string} imageDataURL - Canvas image as data URL
-   * @param {string} filename - PDF filename
-   * @returns {string} HTML content for PDF
-   */
-  createPDFContent(imageDataURL, filename) {
+  
+    // Return original image initially, will be updated when enhanced image is ready
+    const originalUrl = this.getImageUrl();
+  
     return `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="utf-8">
-        <title>${filename}</title>
-        <style>
-          @page {
-            size: A4 portrait;
-            margin: 0.5in;
-          }
-          body {
-            margin: 0;
-            padding: 0;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            font-family: Arial, sans-serif;
-          }
-          .header {
-            text-align: center;
-            margin-bottom: 20px;
-          }
-          .chart-container {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            width: 100%;
-          }
-          .chart-image {
-            max-width: 100%;
-            height: auto;
-            border: 1px solid #ccc;
-          }
-          .footer {
-            margin-top: 20px;
-            text-align: center;
-            font-size: 12px;
-            color: #666;
-          }
-        </style>
-      </head>
-      <body>
-        <div class="header">
-          <h1>AW169 HOGE Performance Chart</h1>
-          <p>Generated: ${new Date().toLocaleString()}</p>
-        </div>
-        <div class="chart-container">
-          <img src="${imageDataURL}" alt="HOGE Chart" class="chart-image">
-        </div>
-        <div class="footer">
-          <p>System Remaster HST - Helicopter Flight Planning System</p>
-          <p>Chart based on AW169 RFM Figure S5-32</p>
-        </div>
-      </body>
-      </html>
+      <img
+        src="${originalUrl}"
+        style="width:100%;height:100%;border:0;object-fit:contain;object-position:top left;"
+        alt="HOGE Performance Chart"
+      />
     `;
   }
 
   /**
-   * Download chart as PNG image
-   * @param {string} filename - Image filename
+   * Generates an enhanced image by combining the base JPG with red line overlay
+   * @returns {Promise<string>} Promise that resolves to the URL of the enhanced image
    */
-  downloadAsImage(filename = 'hoge_chart.png') {
-    if (!this.canvas) {
-      throw new Error('Canvas not initialized. Call generateChart first.');
-    }
-    
-    this.canvas.toBlob((blob) => {
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = filename;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-    }, 'image/png', 1.0);
-  }
-
-  /**
-   * Open chart in new window for printing as PDF
-   */
-  openForPDF() {
-    if (!this.canvas) {
-      throw new Error('Canvas not initialized. Call generateChart first.');
-    }
-    
-    const imageDataURL = this.canvas.toDataURL('image/png', 1.0);
-    const htmlContent = this.createPDFContent(imageDataURL, 'HOGE_Chart.pdf');
-    
-    const newWindow = window.open('', '_blank');
-    newWindow.document.write(htmlContent);
-    newWindow.document.close();
-    
-    // Auto-trigger print dialog after a short delay
-    setTimeout(() => {
-      newWindow.print();
-    }, 1000);
-  }
-
-  /**
-   * Find intersection points between temperature curve and altitude line
-   * @param {number} temperature - Temperature in Celsius
-   * @param {number} altitude - Altitude in feet
-   * @returns {Array} Array of intersection weights
-   */
-  findIntersections(temperature, altitude) {
-    const curve = this.findTemperatureCurve(temperature);
-    const altitudeChart = altitude / 1000; // Convert to chart units
-    const intersections = [];
-    
-    if (curve && curve.points) {
-      for (let i = 0; i < curve.points.length - 1; i++) {
-        const p1 = curve.points[i];
-        const p2 = curve.points[i + 1];
+  async generateEnhancedImage() {
+    try {
+      // Get current temperature from DOM (default to 25°C if not available)
+      const tempInput = document.getElementById('temperature');
+      const temperature = tempInput ? parseFloat(tempInput.value) || 25 : 25;
+      
+      // Fixed altitude for calculations (convert 300ft to thousands)
+      const altitude = 0.3; // 300 ft = 0.3 (in thousands of feet)
+      
+      // Load the base image
+      const baseImage = await this.loadBaseImage();
+      
+      // Create canvas with same dimensions as base image
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      canvas.width = baseImage.naturalWidth || baseImage.width;
+      canvas.height = baseImage.naturalHeight || baseImage.height;
+      
+      // Draw the base image
+      ctx.drawImage(baseImage, 0, 0, canvas.width, canvas.height);
+      
+      // Calculate chart dimensions based on image size - MODIFY THESE VALUES TO CHANGE CHART SIZE
+      const chartLeft = canvas.width * 0.208; // 20.8% from left - increase to move chart right
+      const chartRight = canvas.width * 0.728; // 72.8% from left - increase to make chart wider
+      const chartTop = canvas.height * 0.272; // 27.2% from top - increase to move chart down
+      const chartBottom = canvas.height * 0.653; // 65.3% from top - increase to make chart taller
+      
+      const chartWidth = chartRight - chartLeft;
+      const chartHeight = chartBottom - chartTop;
+      
+      // Pressure altitude range mapping (-1 to 15 ft x1000) - Y-axis
+      const altMin = -1;
+      const altMax = 15;
+      const altRange = altMax - altMin;
+      
+      // Weight range mapping (33 to 49 x100 lbs) - X-axis
+      const weightMin = 33;
+      const weightMax = 49;
+      const weightRange = weightMax - weightMin;
+      
+      // Calculate positions for 300ft altitude line and temperature intersection
+      const altitudeRatio = (altitude - altMin) / altRange;
+      const altY = chartBottom - (altitudeRatio * chartHeight);
+      
+      const weight = this.interpolateWeightAtAltitude(temperature, altitude);
+      const weightRatio = (weight - weightMin) / weightRange;
+      const weightX = chartLeft + (weightRatio * chartWidth);
+      
+      // Find intersection point with temperature gradient line for the horizontal line endpoint
+      const tempIntersectionX = weightX; // This is where the temperature gradient intersects at 300ft altitude
+      
+      // Draw chart grid and axes with 100% opacity
+      ctx.globalAlpha = 0.1;
+      ctx.strokeStyle = '#000000';
+      ctx.lineWidth = 1;
+      // ctx.setLineDash([]);
+      
+      // Draw four corner markers
+      const cornerSize = 10;
+      // Top-left corner
+      ctx.beginPath();
+      ctx.moveTo(chartLeft - cornerSize, chartTop);
+      ctx.lineTo(chartLeft + cornerSize, chartTop);
+      ctx.moveTo(chartLeft, chartTop - cornerSize);
+      ctx.lineTo(chartLeft, chartTop + cornerSize);
+      ctx.stroke();
+      
+      // Top-right corner
+      ctx.beginPath();
+      ctx.moveTo(chartRight - cornerSize, chartTop);
+      ctx.lineTo(chartRight + cornerSize, chartTop);
+      ctx.moveTo(chartRight, chartTop - cornerSize);
+      ctx.lineTo(chartRight, chartTop + cornerSize);
+      ctx.stroke();
+      
+      // Bottom-left corner
+      ctx.beginPath();
+      ctx.moveTo(chartLeft - cornerSize, chartBottom);
+      ctx.lineTo(chartLeft + cornerSize, chartBottom);
+      ctx.moveTo(chartLeft, chartBottom - cornerSize);
+      ctx.lineTo(chartLeft, chartBottom + cornerSize);
+      ctx.stroke();
+      
+      // Bottom-right corner
+      ctx.beginPath();
+      ctx.moveTo(chartRight - cornerSize, chartBottom);
+      ctx.lineTo(chartRight + cornerSize, chartBottom);
+      ctx.moveTo(chartRight, chartBottom - cornerSize);
+      ctx.lineTo(chartRight, chartBottom + cornerSize);
+      ctx.stroke();
+      
+      // Draw grid lines - vertical (weight)
+      for (let w = weightMin; w <= weightMax; w += 2) { // Every 2 units (x100 lbs)
+        const gridX = chartLeft + ((w - weightMin) / weightRange) * chartWidth;
+        ctx.beginPath();
+        ctx.moveTo(gridX, chartTop);
+        ctx.lineTo(gridX, chartBottom);
+        ctx.stroke();
+      }
+      
+      // Draw grid lines - horizontal (pressure altitude)
+      for (let a = altMin; a <= altMax; a += 2) { // Every 2 units (x1000 ft)
+        const gridY = chartBottom - ((a - altMin) / altRange) * chartHeight;
+        ctx.beginPath();
+        ctx.moveTo(chartLeft, gridY);
+        ctx.lineTo(chartRight, gridY);
+        ctx.stroke();
+      }
+      
+      // Draw temperature gradient lines using HOGE_OAT_LINES data
+      const tempColors = ['#0066cc', '#0080ff', '#00aaff', '#ff6600', '#ff0000']; // Blue to red gradient
+      this.HOGE_OAT_LINES.forEach((tempLine, index) => {
+        ctx.strokeStyle = tempColors[index] || '#666666';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([]);
         
-        // Check if altitude line intersects this segment
-        if ((p1.altitude <= altitudeChart && p2.altitude >= altitudeChart) ||
-            (p1.altitude >= altitudeChart && p2.altitude <= altitudeChart)) {
+        ctx.beginPath();
+        let firstPoint = true;
+        tempLine.points.forEach(point => {
+          const x = chartLeft + ((point.weight - weightMin) / weightRange) * chartWidth;
+          const y = chartBottom - ((point.alt - altMin) / altRange) * chartHeight;
           
-          // Linear interpolation to find exact intersection weight
-          const ratio = (altitudeChart - p1.altitude) / (p2.altitude - p1.altitude);
-          const intersectionWeight = p1.weight + (p2.weight - p1.weight) * ratio;
-          intersections.push(intersectionWeight * 100); // Convert to actual kg
+          if (firstPoint) {
+            ctx.moveTo(x, y);
+            firstPoint = false;
+          } else {
+            ctx.lineTo(x, y);
+          }
+        });
+        ctx.stroke();
+        
+        // Add temperature label at the end of each line
+        const lastPoint = tempLine.points[tempLine.points.length - 1];
+        const labelX = chartLeft + ((lastPoint.weight - weightMin) / weightRange) * chartWidth;
+        const labelY = chartBottom - ((lastPoint.alt - altMin) / altRange) * chartHeight;
+        
+        ctx.font = 'bold 12px Arial';
+        ctx.fillStyle = tempColors[index] || '#666666';
+        ctx.textAlign = 'left';
+        ctx.fillText(`${tempLine.oat}°C`, labelX + 5, labelY - 5);
+      });
+      
+      // Reset styles for axis labels
+      ctx.strokeStyle = '#000000';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([]);
+      
+      // Draw X-axis labels (weight)
+      ctx.font = 'bold 14px Arial';
+      ctx.fillStyle = 'rgba(0, 0, 0, 1.0)';
+      ctx.textAlign = 'center';
+      for (let w = weightMin; w <= weightMax; w += 2) {
+        const labelX = chartLeft + ((w - weightMin) / weightRange) * chartWidth;
+        ctx.fillText(`${w}`, labelX, chartBottom + 25);
+      }
+      
+      // Draw Y-axis labels (pressure altitude)
+      ctx.textAlign = 'end';
+      for (let a = altMin; a <= altMax; a += 2) {
+        const labelY = chartBottom - ((a - altMin) / altRange) * chartHeight;
+        ctx.fillText(`${a}`, chartLeft - 10, labelY + 5);
+      }
+      
+      // Draw axis titles with 100% opacity
+      ctx.font = 'bold 16px Arial';
+      ctx.textAlign = 'center';
+      
+      // X-axis title (Weight)
+      // ctx.fillText('Gross Weight (x100 lbs)', (chartLeft + chartRight) / 2, chartBottom + 50);
+      
+      // Y-axis title (Pressure Altitude)
+      ctx.save();
+      ctx.translate(chartLeft - 60, (chartTop + chartBottom) / 2);
+      ctx.rotate(-Math.PI / 2);
+      ctx.fillText('Pressure Altitude (ft x 1000)', 0, 0);
+      ctx.restore();
+      
+      // Draw red overlay lines with 100% opacity for 300ft altitude line
+      ctx.globalAlpha = 1.0;
+      ctx.strokeStyle = 'red';
+      ctx.lineWidth = 4;
+      ctx.setLineDash([]); // Solid line
+      
+      // Horizontal line at 300ft altitude - stops at temperature intersection
+      ctx.beginPath();
+      ctx.moveTo(chartLeft, altY);
+      ctx.lineTo(tempIntersectionX, altY);
+      ctx.stroke();
+      
+      // Vertical line from intersection to X-axis
+      ctx.beginPath();
+      ctx.moveTo(weightX, altY);
+      ctx.lineTo(weightX, chartBottom);
+      ctx.stroke();
+      
+      // No intersection dot - removed as requested
+      
+      // Add labels with semi-transparent background
+      ctx.font = 'bold 18px Arial';
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.9)'; // Semi-transparent white background
+      
+      // Altitude label background (300ft)
+      const altText = `300ft`;
+      const altMetrics = ctx.measureText(altText);
+      ctx.fillRect(chartLeft - altMetrics.width - 25, altY - 12, altMetrics.width + 10, 24);
+      
+      // Altitude label text
+      ctx.fillStyle = 'red';
+      ctx.textAlign = 'end';
+      ctx.fillText(altText, chartLeft - 15, altY + 6);
+      
+      // Weight label background (multiply by 100 to show actual pounds)
+      const actualWeight = (weight * 100).toFixed(0); // Convert to actual pounds
+      const weightText = `${actualWeight}`;
+      const weightMetrics = ctx.measureText(weightText);
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+      ctx.fillRect(weightX - weightMetrics.width/2 - 5, chartBottom + 5, weightMetrics.width + 10, 24);
+      
+      // Weight label text
+      ctx.fillStyle = 'red';
+      ctx.textAlign = 'center';
+      ctx.fillText(weightText, weightX, chartBottom + 22);
+      
+      // Temperature indicator at intersection point
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+      const tempText = `${temperature}°C`;
+      const tempMetrics = ctx.measureText(tempText);
+      ctx.fillRect(weightX + 10, altY - 12, tempMetrics.width + 10, 24);
+      
+      ctx.fillStyle = 'red';
+      ctx.textAlign = 'left';
+      ctx.fillText(tempText, weightX + 15, altY + 6);
+      
+      // ====== SECOND CHART: WIND SPEED vs WEIGHT (BOTTOM CHART) ======
+      
+      // Calculate bottom chart dimensions - MODIFY THESE VALUES TO CHANGE BOTTOM CHART SIZE
+      const bottomChartLeft = canvas.width * 0.208; // 20.8% from left - increase to move chart right
+      const bottomChartRight = canvas.width * 0.728; // 72.8% from left - increase to make chart wider
+      const bottomChartTop = canvas.height * 0.272; // 27.2% from top - increase to move chart down
+      const bottomChartBottom = canvas.height * 0.653; // 65.3% from top - increase to make chart taller
+      
+      const bottomChartWidth = bottomChartRight - bottomChartLeft;
+      const bottomChartHeight = bottomChartBottom - bottomChartTop;
+      
+      // Wind speed levels (non-constant intervals: 5, 10, 20, 50 kts)
+      const windSpeedLevels = [5, 10, 20, 50];
+      const weightRangeMin = 3400; // kg
+      const weightRangeMax = 4600; // kg
+      const weightRangeSpan = weightRangeMax - weightRangeMin;
+      
+      // Get current wind speed from DOM (default to 0 if not available)
+      const windSpeedInput = document.getElementById('wind-speed');
+      const currentWindSpeed = windSpeedInput ? parseFloat(windSpeedInput.value) || 0 : 0;
+      
+      // Get wind benefits from DOM (default to 75%)
+      const windBenefitsInput = document.getElementById('wind-benefits');
+      const windBenefits = windBenefitsInput ? parseFloat(windBenefitsInput.value) || 75 : 75;
+      
+      // Draw bottom chart grid with 50% opacity
+      ctx.globalAlpha = 0.5;
+      ctx.strokeStyle = '#000000';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([]);
+      
+      // Draw four corner markers for bottom chart
+      const bottomCornerSize = 10;
+      // Top-left corner
+      ctx.beginPath();
+      ctx.moveTo(bottomChartLeft - bottomCornerSize, bottomChartTop);
+      ctx.lineTo(bottomChartLeft + bottomCornerSize, bottomChartTop);
+      ctx.moveTo(bottomChartLeft, bottomChartTop - bottomCornerSize);
+      ctx.lineTo(bottomChartLeft, bottomChartTop + bottomCornerSize);
+      ctx.stroke();
+      
+      // Top-right corner
+      ctx.beginPath();
+      ctx.moveTo(bottomChartRight - bottomCornerSize, bottomChartTop);
+      ctx.lineTo(bottomChartRight + bottomCornerSize, bottomChartTop);
+      ctx.moveTo(bottomChartRight, bottomChartTop - bottomCornerSize);
+      ctx.lineTo(bottomChartRight, bottomChartTop + bottomCornerSize);
+      ctx.stroke();
+      
+      // Bottom-left corner
+      ctx.beginPath();
+      ctx.moveTo(bottomChartLeft - bottomCornerSize, bottomChartBottom);
+      ctx.lineTo(bottomChartLeft + bottomCornerSize, bottomChartBottom);
+      ctx.moveTo(bottomChartLeft, bottomChartBottom - bottomCornerSize);
+      ctx.lineTo(bottomChartLeft, bottomChartBottom + bottomCornerSize);
+      ctx.stroke();
+      
+      // Bottom-right corner
+      ctx.beginPath();
+      ctx.moveTo(bottomChartRight - bottomCornerSize, bottomChartBottom);
+      ctx.lineTo(bottomChartRight + bottomCornerSize, bottomChartBottom);
+      ctx.moveTo(bottomChartRight, bottomChartBottom - bottomCornerSize);
+      ctx.lineTo(bottomChartRight, bottomChartBottom + bottomCornerSize);
+      ctx.stroke();
+      
+      // Draw vertical grid lines (weight) - every 100 kg
+      for (let w = weightRangeMin; w <= weightRangeMax; w += 100) {
+        const gridX = bottomChartLeft + ((w - weightRangeMin) / weightRangeSpan) * bottomChartWidth;
+        ctx.beginPath();
+        ctx.moveTo(gridX, bottomChartTop);
+        ctx.lineTo(gridX, bottomChartBottom);
+        ctx.stroke();
+      }
+      
+      // Draw horizontal grid lines for wind speed levels (non-constant intervals)
+      windSpeedLevels.forEach(windSpeed => {
+        const windY = this._mapWindSpeedToY(windSpeed, bottomChartTop, bottomChartBottom);
+        ctx.beginPath();
+        ctx.moveTo(bottomChartLeft, windY);
+        ctx.lineTo(bottomChartRight, windY);
+        ctx.stroke();
+      });
+      
+      // Draw X-axis labels (weight) for bottom chart - MOVED TO TOP
+      ctx.font = 'bold 14px Arial';
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+      ctx.textAlign = 'center';
+      for (let w = weightRangeMin; w <= weightRangeMax; w += 200) { // Every 200 kg for cleaner labels
+        const labelX = bottomChartLeft + ((w - weightRangeMin) / weightRangeSpan) * bottomChartWidth;
+        ctx.fillText(`${w}`, labelX, bottomChartTop - 10); // Moved to top
+      }
+      
+      // Draw Y-axis labels (wind speed) for bottom chart
+      ctx.textAlign = 'end';
+      windSpeedLevels.forEach(windSpeed => {
+        const labelY = this._mapWindSpeedToY(windSpeed, bottomChartTop, bottomChartBottom);
+        ctx.fillText(`${windSpeed}`, bottomChartLeft - 10, labelY + 5);
+      });
+      
+      // Draw axis titles for bottom chart
+      ctx.font = 'bold 16px Arial';
+      ctx.textAlign = 'center';
+      
+      // X-axis title (Weight) - MOVED TO TOP
+      ctx.fillText('Gross Weight (kg)', (bottomChartLeft + bottomChartRight) / 2, bottomChartTop - 35);
+      
+      // Y-axis title (Wind Speed)
+      ctx.save();
+      ctx.translate(bottomChartLeft - 60, (bottomChartTop + bottomChartBottom) / 2);
+      ctx.rotate(-Math.PI / 2);
+      ctx.fillText('Wind Speed (kts)', 0, 0);
+      ctx.restore();
+      
+      // Draw wind speed curves using HOGE_HEADWIND_INCREASES data
+      ctx.globalAlpha = 1.0;
+      const windColors = ['#0066cc', '#00aaff', '#ff6600', '#ff0000']; // Blue to red for different wind speeds
+      
+      windSpeedLevels.forEach((targetWindSpeed, index) => {
+        ctx.strokeStyle = windColors[index] || '#666666';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([]);
+        
+        ctx.beginPath();
+        let firstPoint = true;
+        
+        // Generate curve points across weight range
+        for (let w = weightRangeMin; w <= weightRangeMax; w += 50) {
+          const windY = this._mapWindSpeedToY(targetWindSpeed, bottomChartTop, bottomChartBottom);
+          const weightX = bottomChartLeft + ((w - weightRangeMin) / weightRangeSpan) * bottomChartWidth;
+          
+          if (firstPoint) {
+            ctx.moveTo(weightX, windY);
+            firstPoint = false;
+          } else {
+            ctx.lineTo(weightX, windY);
+          }
         }
+        ctx.stroke();
+        
+        // Add wind speed label at the end of each line
+        const labelX = bottomChartRight + 5;
+        const labelY = this._mapWindSpeedToY(targetWindSpeed, bottomChartTop, bottomChartBottom);
+        
+        ctx.font = 'bold 12px Arial';
+        ctx.fillStyle = windColors[index] || '#666666';
+        ctx.textAlign = 'left';
+        ctx.fillText(`${targetWindSpeed} kts`, labelX, labelY + 5);
+      });
+      
+      // Draw red overlay lines for current wind speed - always show for testing
+      // Force show red lines with default values for now
+      const displayWindSpeed = currentWindSpeed || 10; // Use 10 kts as default if no wind speed
+      
+      ctx.globalAlpha = 1.0;
+      ctx.strokeStyle = 'red';
+      ctx.lineWidth = 4;
+      ctx.setLineDash([]); // Solid line
+      
+      // Calculate wind speed adjustment for typical weight (4000kg)
+      const windAdjustment = this._calculateWindSpeedAdjustment(displayWindSpeed, 4000, windBenefits);
+      const adjustedWeight = 4000 + windAdjustment;
+      
+      const currentWindY = this._mapWindSpeedToY(displayWindSpeed, bottomChartTop, bottomChartBottom);
+      const adjustedWeightX = bottomChartLeft + ((adjustedWeight - weightRangeMin) / weightRangeSpan) * bottomChartWidth;
+      
+      // Horizontal line at current wind speed - stops at weight intersection
+      ctx.beginPath();
+      ctx.moveTo(bottomChartLeft, currentWindY);
+      ctx.lineTo(adjustedWeightX, currentWindY);
+      ctx.stroke();
+      
+      // Vertical line from intersection to X-axis (TOP)
+      ctx.beginPath();
+      ctx.moveTo(adjustedWeightX, currentWindY);
+      ctx.lineTo(adjustedWeightX, bottomChartTop);
+      ctx.stroke();
+      
+      // Add labels for bottom chart
+      ctx.font = 'bold 18px Arial';
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+      
+      // Wind speed label
+      const windText = `${displayWindSpeed} kts`;
+      const windMetrics = ctx.measureText(windText);
+      ctx.fillRect(bottomChartLeft - windMetrics.width - 25, currentWindY - 12, windMetrics.width + 10, 24);
+      
+      ctx.fillStyle = 'red';
+      ctx.textAlign = 'end';
+      ctx.fillText(windText, bottomChartLeft - 15, currentWindY + 6);
+      
+      // Weight label - MOVED TO TOP
+      const adjustedWeightText = `${adjustedWeight.toFixed(0)}`;
+      const adjustedWeightMetrics = ctx.measureText(adjustedWeightText);
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+      ctx.fillRect(adjustedWeightX - adjustedWeightMetrics.width/2 - 5, bottomChartTop - 35, adjustedWeightMetrics.width + 10, 24);
+      
+      ctx.fillStyle = 'red';
+      ctx.textAlign = 'center';
+      ctx.fillText(adjustedWeightText, adjustedWeightX, bottomChartTop - 18);
+      
+      // Wind benefits label at intersection
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+      const benefitsText = `${windBenefits}%`;
+      const benefitsMetrics = ctx.measureText(benefitsText);
+      ctx.fillRect(adjustedWeightX + 10, currentWindY - 12, benefitsMetrics.width + 10, 24);
+      
+      ctx.fillStyle = 'red';
+      ctx.textAlign = 'left';
+      ctx.fillText(benefitsText, adjustedWeightX + 15, currentWindY + 6);
+      
+      // Convert canvas to blob and create object URL
+      return new Promise((resolve, reject) => {
+        canvas.toBlob((blob) => {
+          if (blob) {
+            const url = URL.createObjectURL(blob);
+            // Store URL for cleanup later
+            if (this.generatedImageUrl) {
+              URL.revokeObjectURL(this.generatedImageUrl);
+            }
+            this.generatedImageUrl = url;
+            resolve(url);
+          } else {
+            reject(new Error('Failed to create blob from canvas'));
+          }
+        }, 'image/jpeg', 0.95); // High quality JPEG
+      });
+      
+    } catch (error) {
+      console.error('Error generating enhanced image:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Loads the base HOGE image
+   * @returns {Promise<HTMLImageElement>} Promise that resolves to the loaded image
+   */
+  async loadBaseImage() {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.crossOrigin = 'anonymous'; // Enable cross-origin for canvas
+      img.onload = () => resolve(img);
+      img.onerror = () => reject(new Error('Failed to load base image'));
+      img.src = this.getImageUrl();
+    });
+  }
+
+
+  /**
+   * Interpolates weight from temperature and altitude using HOGE_OAT_LINES data
+   * @param {number} temperature - Temperature in Celsius (0-40°C)
+   * @param {number} altitude - Altitude in thousands of feet
+   * @returns {number} Interpolated weight (x100 lbs)
+   */
+  interpolateWeightAtAltitude(temperature, altitude) {
+    const data = this.HOGE_OAT_LINES;
+    
+    // Clamp temperature to available range (0-40°C)
+    const clampedTemp = Math.max(0, Math.min(40, temperature));
+    
+    // Find the two OAT lines that bracket our temperature
+    let lowerLine = null;
+    let upperLine = null;
+    
+    for (let i = 0; i < data.length - 1; i++) {
+      if (clampedTemp >= data[i].oat && clampedTemp <= data[i + 1].oat) {
+        lowerLine = data[i];
+        upperLine = data[i + 1];
+        break;
       }
     }
     
-    return intersections;
+    // If exact match or outside range, use single line
+    if (!lowerLine || !upperLine) {
+      const exactLine = data.find(line => line.oat === clampedTemp);
+      if (exactLine) {
+        return this.interpolateWeightFromAltitude(exactLine.points, altitude);
+      }
+      // Use nearest line if outside range
+      if (clampedTemp <= data[0].oat) {
+        return this.interpolateWeightFromAltitude(data[0].points, altitude);
+      } else {
+        return this.interpolateWeightFromAltitude(data[data.length - 1].points, altitude);
+      }
+    }
+    
+    // Interpolate between two OAT lines
+    const tempRatio = (clampedTemp - lowerLine.oat) / (upperLine.oat - lowerLine.oat);
+    const lowerWeight = this.interpolateWeightFromAltitude(lowerLine.points, altitude);
+    const upperWeight = this.interpolateWeightFromAltitude(upperLine.points, altitude);
+    
+    return lowerWeight + tempRatio * (upperWeight - lowerWeight);
   }
+
+  /**
+   * Interpolates weight from altitude using a single OAT line's points
+   * @param {Array} points - Array of {alt, weight} points for a specific OAT
+   * @param {number} altitude - Altitude in thousands of feet
+   * @returns {number} Interpolated weight (x100 lbs)
+   */
+  interpolateWeightFromAltitude(points, altitude) {
+    // Sort points by altitude (ascending)
+    const sortedPoints = [...points].sort((a, b) => a.alt - b.alt);
+    
+    // If altitude is outside range, use nearest point
+    if (altitude <= sortedPoints[0].alt) {
+      return sortedPoints[0].weight;
+    }
+    if (altitude >= sortedPoints[sortedPoints.length - 1].alt) {
+      return sortedPoints[sortedPoints.length - 1].weight;
+    }
+    
+    // Find surrounding points for interpolation
+    for (let i = 0; i < sortedPoints.length - 1; i++) {
+      if (altitude >= sortedPoints[i].alt && altitude <= sortedPoints[i + 1].alt) {
+        // Linear interpolation
+        const altRatio = (altitude - sortedPoints[i].alt) / (sortedPoints[i + 1].alt - sortedPoints[i].alt);
+        return sortedPoints[i].weight + altRatio * (sortedPoints[i + 1].weight - sortedPoints[i].weight);
+      }
+    }
+    
+    // Fallback (should not reach here)
+    return 40; // Default weight value
+  }
+
+  /**
+   * Maps wind speed to Y coordinate using non-linear scale (5 at top, 50 at bottom)
+   * @param {number} windSpeed - Wind speed in knots
+   * @param {number} chartTop - Top Y coordinate of chart
+   * @param {number} chartBottom - Bottom Y coordinate of chart
+   * @returns {number} Y coordinate for the wind speed
+   */
+  _mapWindSpeedToY(windSpeed, chartTop, chartBottom) {
+    const windSpeedLevels = [5, 10, 20, 50]; // 5 at top, 50 at bottom
+    const chartHeight = chartBottom - chartTop;
+    
+    // Find position within the non-linear scale (flipped: 5 at top, 50 at bottom)
+    if (windSpeed <= windSpeedLevels[0]) {
+      // Below minimum (5), place at top
+      return chartTop;
+    }
+    
+    if (windSpeed >= windSpeedLevels[windSpeedLevels.length - 1]) {
+      // Above maximum (50), place at bottom
+      return chartBottom;
+    }
+    
+    // Find which interval the wind speed falls into
+    for (let i = 0; i < windSpeedLevels.length - 1; i++) {
+      if (windSpeed >= windSpeedLevels[i] && windSpeed <= windSpeedLevels[i + 1]) {
+        // Linear interpolation within this interval
+        const lowerSpeed = windSpeedLevels[i];
+        const upperSpeed = windSpeedLevels[i + 1];
+        const ratio = (windSpeed - lowerSpeed) / (upperSpeed - lowerSpeed);
+        
+        // Each interval takes equal vertical space (flipped)
+        const intervalHeight = chartHeight / (windSpeedLevels.length - 1);
+        const intervalStart = chartTop + i * intervalHeight;
+        const intervalEnd = chartTop + (i + 1) * intervalHeight;
+        
+        return intervalStart + ratio * intervalHeight;
+      }
+    }
+    
+    // Fallback
+    return chartTop;
+  }
+  
+  /**
+   * Calculates wind speed adjustment using HOGE_HEADWIND_INCREASES data
+   * @param {number} windSpeed - Wind speed in knots
+   * @param {number} baseWeight - Base aircraft weight in kg
+   * @param {number} windBenefits - Wind benefits percentage (0-100)
+   * @returns {number} Weight adjustment in kg
+   */
+  _calculateWindSpeedAdjustment(windSpeed, baseWeight, windBenefits = 75) {
+    // This is a simplified version - in reality you'd need the full HOGE_HEADWIND_INCREASES data
+    // For now, we'll simulate the adjustment based on wind speed
+    
+    const windSpeedIndex = Math.min(Math.floor(windSpeed), 50); // Clamp to max 50 kts
+    const weightIndex = Math.floor((Math.min(Math.max(baseWeight, 3400), 4400) - 3400) / 100); // Map weight to index
+    
+    // Simplified calculation - in reality this would use the full HOGE_HEADWIND_INCREASES array
+    let baseAdjustment = 0;
+    if (windSpeed <= 5) {
+      baseAdjustment = windSpeed * 20; // ~100 kg at 5 kts
+    } else if (windSpeed <= 10) {
+      baseAdjustment = 100 + (windSpeed - 5) * 30; // 100 + up to 150 more
+    } else if (windSpeed <= 20) {
+      baseAdjustment = 250 + (windSpeed - 10) * 50; // 250 + up to 500 more
+    } else {
+      baseAdjustment = 750 + (windSpeed - 20) * 100; // 750 + up to 3000 more
+    }
+    
+    // Apply wind benefits percentage
+    const windBenefitsDecimal = Math.max(0, Math.min(100, windBenefits)) / 100;
+    return baseAdjustment * windBenefitsDecimal;
+  }
+
+  /**
+   * Cleanup generated image URLs to free memory
+   */
+  cleanup() {
+    if (this.generatedImageUrl) {
+      URL.revokeObjectURL(this.generatedImageUrl);
+      this.generatedImageUrl = null;
+    }
+  }
+
 }
+
+
+
